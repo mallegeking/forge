@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Projects/**)",
+      "Bash(printf \"N\\\\nN\\\\n\")",
+      "Bash(npx create-next-app@latest multipee-temp --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(yes \"N\")",
+      "Bash(cp -r D:/Projects/multipee-temp/. \"D:/Projects/MultiPee/\")",
+      "Bash(rm -rf D:/Projects/multipee-temp)",
+      "Bash(npm install:*)"
+    ]
+  }
+}
