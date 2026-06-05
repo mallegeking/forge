@@ -9,20 +9,20 @@
 
 import { getCoachingInput } from "@/lib/queries";
 import { buildCoachingBrief, COACH_SYSTEM_PROMPT } from "@/lib/coach";
-import { resolveCoachProvider } from "@/lib/coach-provider";
+import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach, type CoachMessage } from "@/lib/coach-stream";
 
 // Reads the DB + env per request; never prerender.
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const provider = resolveCoachProvider();
+  const provider = await getCoachProvider();
   if (!provider) {
     return Response.json(
       {
         error: "coach_disabled",
         message:
-          "The coach is off. Add a provider key (e.g. ANTHROPIC_API_KEY, OPENROUTER_API_KEY, or GEMINI_API_KEY) to .env.local to enable it.",
+          "The coach is off. Connect a provider in Settings (or set a provider key in .env.local).",
       },
       { status: 503 }
     );

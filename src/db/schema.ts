@@ -144,6 +144,19 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
 });
 
+// Bodyweight measurements — one row per weigh-in. The UI charts the weekly
+// average so day-to-day noise (water, food) doesn't drown out the trend.
+export const bodyweightLogs = sqliteTable("bodyweight_logs", {
+  id: text("id").primaryKey(),
+  weightKg: real("weight_kg").notNull(),
+  measuredAt: integer("measured_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type Program = typeof programs.$inferSelect;
 export type ProgramDay = typeof programDays.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
@@ -151,3 +164,4 @@ export type ProgramDayExercise = typeof programDayExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
 export type SessionExerciseNote = typeof sessionExerciseNotes.$inferSelect;
+export type BodyweightLog = typeof bodyweightLogs.$inferSelect;

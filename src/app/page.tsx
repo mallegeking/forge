@@ -22,6 +22,8 @@ import {
   CalendarRange,
   Sparkles,
   Moon,
+  Scale,
+  Settings,
 } from "lucide-react";
 
 // Reads the database and resolves "today" — must render per request, never
@@ -68,15 +70,24 @@ export default async function Home() {
           </div>
           <span className="text-lg font-semibold tracking-tight">Forge</span>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            aria-label="Lock app"
+        <div className="flex items-center gap-1">
+          <Link
+            href="/settings"
+            aria-label="Settings"
             className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            <LockKeyhole className="size-4" />
-          </button>
-        </form>
+            <Settings className="size-4" />
+          </Link>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              aria-label="Lock app"
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LockKeyhole className="size-4" />
+            </button>
+          </form>
+        </div>
       </header>
 
       {/* Today hero — the day's session is one tap from here. */}
@@ -148,6 +159,23 @@ export default async function Home() {
           <p className="text-sm font-medium">Ask your coach</p>
           <p className="text-xs text-muted-foreground">
             AI advice from your training history
+          </p>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </Link>
+
+      {/* Bodyweight entry */}
+      <Link
+        href="/bodyweight"
+        className="mb-5 flex items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40"
+      >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <Scale className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Bodyweight</p>
+          <p className="text-xs text-muted-foreground">
+            Log weigh-ins · weekly average &amp; trend
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

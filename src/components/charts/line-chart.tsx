@@ -4,7 +4,13 @@ type Point = { label: string; value: number };
 
 // Lightweight hand-rolled SVG line chart — no charting dependency, consistent
 // with the existing hand-rolled ProgressRing. Renders responsively via viewBox.
-export function LineChart({ data }: { data: Point[] }) {
+export function LineChart({
+  data,
+  ariaLabel = "Top set weight over time",
+}: {
+  data: Point[];
+  ariaLabel?: string;
+}) {
   if (data.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
@@ -41,7 +47,7 @@ export function LineChart({ data }: { data: Point[] }) {
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         role="img"
-        aria-label="Top set weight over time"
+        aria-label={ariaLabel}
       >
         {/* y-axis gridlines + labels (max / min) */}
         {[max, min].map((v) => (

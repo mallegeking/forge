@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveCoachProvider } from "./coach-provider";
+import { resolveCoachProvider, resolveCoachProviderWith } from "./coach-provider";
 
 describe("resolveCoachProvider — auto-detection", () => {
   it("returns null when nothing is configured", () => {
@@ -97,5 +97,35 @@ describe("resolveCoachProvider — overrides", () => {
       COACH_MODEL: "local-model",
     });
     expect(p).toMatchObject({ kind: "openai", provider: "custom" });
+  });
+});
+
+describe("resolveCoachProviderWith — DB settings over env", () => {
+  it("DB provider + key win over an env key", () => {
+    const p = resolveCoachProviderWith(
+      { ANTHROPIC_API_KEY: "env-ant" },
+      { provider: "gemini", apiKey: "db-gem" }
+    );
+    expect(p).toMatchObject({ kind: "openai", provider: "gemini", apiKey: "db-gem" });
+  });
+
+  it("empty DB values leave env resolution untouched", () => {
+    const p = resolveCoachProviderWith(
+      { ANTHROPIC_API_KEY: "env-ant" },
+      { provider: "", apiKey: "", model: null, baseUrl: undefined }
+    );
+    expect(p).toMatchObject({ kind: "anthropic", apiKey: "env-ant" });
+  });
+
+  it("DB model overrides the provider default", () => {
+    const p = resolveCoachProviderWith(
+      {},
+      { provider: "anthropic", apiKey: "k", model: "claude-opus-4-8" }
+    );
+    expect(p).toMatchObject({ kind: "anthropic", model: "claude-opus-4-8" });
+  });
+
+  it("nothing configured anywhere → null", () => {
+    expect(resolveCoachProviderWith({}, {})).toBeNull();
   });
 });

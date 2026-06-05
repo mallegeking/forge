@@ -7,6 +7,7 @@ import {
   workoutSessions,
   setLogs,
   sessionExerciseNotes,
+  bodyweightLogs,
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, ne } from "drizzle-orm";
@@ -419,4 +420,12 @@ export async function getAllPrograms() {
     .select()
     .from(programs)
     .orderBy(desc(programs.isActive), desc(programs.createdAt));
+}
+
+/** Every bodyweight weigh-in, oldest first (for the weekly-average chart). */
+export async function getBodyweightEntries() {
+  return db
+    .select()
+    .from(bodyweightLogs)
+    .orderBy(asc(bodyweightLogs.measuredAt));
 }

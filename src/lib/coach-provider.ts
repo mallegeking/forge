@@ -120,3 +120,25 @@ export function resolveCoachProvider(env: Env = process.env): CoachProvider | nu
   }
   return null;
 }
+
+/** Coach config saved in the DB (settings table) by the in-app settings screen. */
+export type CoachSettings = {
+  provider?: string | null;
+  model?: string | null;
+  apiKey?: string | null;
+  baseUrl?: string | null;
+};
+
+/**
+ * Resolve using DB-saved settings layered over env — non-empty DB values win, so
+ * configuring the coach in the app overrides any `.env.local` keys. Pure, so the
+ * server wrapper (`getCoachProvider`) and tests share one resolution path.
+ */
+export function resolveCoachProviderWith(env: Env, db: CoachSettings): CoachProvider | null {
+  const merged: Env = { ...env };
+  if (clean(db.provider ?? undefined)) merged.COACH_PROVIDER = db.provider!;
+  if (clean(db.model ?? undefined)) merged.COACH_MODEL = db.model!;
+  if (clean(db.apiKey ?? undefined)) merged.COACH_API_KEY = db.apiKey!;
+  if (clean(db.baseUrl ?? undefined)) merged.COACH_BASE_URL = db.baseUrl!;
+  return resolveCoachProvider(merged);
+}

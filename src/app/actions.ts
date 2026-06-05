@@ -27,7 +27,13 @@ import {
   archiveProgram,
   restoreProgram,
   setActiveProgram,
+  logBodyweight,
+  deleteBodyweight,
+  saveCoachSettings,
+  clearCoachSettings,
 } from "@/lib/mutations";
+import { getCoachProvider } from "@/lib/coach-config";
+import { streamCoach } from "@/lib/coach-stream";
 import type { ExerciseType } from "@/db/schema";
 
 // --- Auth ---
@@ -232,4 +238,65 @@ export async function restoreProgramAction(input: { id: string }) {
 export async function setActiveProgramAction(input: { id: string }) {
   await setActiveProgram(input.id);
   revalidateProgram();
+}
+
+// --- Bodyweight ---
+
+export async function logBodyweightAction(input: {
+  weightKg: number;
+  measuredAt?: string;
+}) {
+  await logBodyweight({
+    weightKg: input.weightKg,
+    measuredAt: input.measuredAt ? new Date(input.measuredAt) : undefined,
+  });
+  revalidatePath("/bodyweight");
+}
+
+export async function deleteBodyweightAction(input: { id: string }) {
+  await deleteBodyweight(input.id);
+  revalidatePath("/bodyweight");
+}
+
+// --- Coach provider settings ---
+
+export async function saveCoachSettingsAction(input: {
+  provider: string;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}) {
+  await saveCoachSettings(input);
+  revalidatePath("/settings");
+  revalidatePath("/coach");
+}
+
+export async function disconnectCoachAction() {
+  await clearCoachSettings();
+  revalidatePath("/settings");
+  revalidatePath("/coach");
+}
+
+/** Live check of the currently-saved provider — used by the Settings "Test" button. */
+export async function testCoachAction(): Promise<{ ok: boolean; message: string }> {
+  const provider = await getCoachProvider();
+  if (!provider) return { ok: false, message: "No provider configured yet." };
+  const name = provider.kind === "anthropic" ? "anthropic" : provider.provider;
+  try {
+    let out = "";
+    for await (const chunk of streamCoach(
+      provider,
+      "You are a connection test.",
+      [{ role: "user", content: "Reply with exactly: ok" }]
+    )) {
+      out += chunk;
+      if (out.length > 30) break;
+    }
+    return { ok: true, message: `Connected to ${name} (${provider.model}).` };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message.slice(0, 200) : "Request failed.",
+    };
+  }
 }

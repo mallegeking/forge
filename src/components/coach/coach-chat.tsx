@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Send, KeyRound } from "lucide-react";
+import { Sparkles, Send, KeyRound, Settings } from "lucide-react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -87,14 +88,16 @@ export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
         <div>
           <h2 className="font-medium">Coach is off</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add a provider key (e.g.{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">ANTHROPIC_API_KEY</code>,{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">OPENROUTER_API_KEY</code>, or{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">GEMINI_API_KEY</code>) to your{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">.env.local</code> and restart
-            the app to chat with your coach.
+            Connect an AI provider to start chatting with your coach.
           </p>
         </div>
+        <Link
+          href="/settings"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+        >
+          <Settings className="size-4" />
+          Open settings
+        </Link>
       </Card>
     );
   }

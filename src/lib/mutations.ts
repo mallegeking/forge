@@ -8,6 +8,7 @@ import {
   setLogs,
   sessionExerciseNotes,
   settings,
+  bodyweightLogs,
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNull, lt } from "drizzle-orm";
@@ -379,4 +380,48 @@ export async function setActiveProgram(id: string) {
     .update(programs)
     .set({ isActive: true, archivedAt: null, updatedAt: new Date() })
     .where(eq(programs.id, id));
+}
+
+// --- Bodyweight ---
+
+export async function logBodyweight(input: {
+  weightKg: number;
+  measuredAt?: Date;
+}) {
+  const id = nanoid();
+  await db.insert(bodyweightLogs).values({
+    id,
+    weightKg: input.weightKg,
+    ...(input.measuredAt ? { measuredAt: input.measuredAt } : {}),
+  });
+  return id;
+}
+
+export async function deleteBodyweight(id: string) {
+  await db.delete(bodyweightLogs).where(eq(bodyweightLogs.id, id));
+}
+
+// --- Coach provider settings (saved in the key/value settings table) ---
+
+export async function saveCoachSettings(input: {
+  provider: string;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}) {
+  await setSetting("coachProvider", input.provider.trim());
+  await setSetting("coachModel", input.model?.trim() ?? "");
+  await setSetting("coachBaseUrl", input.baseUrl?.trim() ?? "");
+  // Only overwrite the saved key when a new one is supplied (blank = keep existing).
+  if (input.apiKey && input.apiKey.trim()) {
+    await setSetting("coachApiKey", input.apiKey.trim());
+  }
+}
+
+/** Disconnect: clear all DB coach settings so resolution falls back to env. */
+export async function clearCoachSettings() {
+  await setSetting("coachProvider", "");
+  await setSetting("coachModel", "");
+  await setSetting("coachBaseUrl", "");
+  await setSetting("coachApiKey", "");
 }
