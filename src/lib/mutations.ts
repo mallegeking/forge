@@ -9,6 +9,7 @@ import {
   sessionExerciseNotes,
   settings,
   bodyweightLogs,
+  progressPhotos,
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNull, lt } from "drizzle-orm";
@@ -424,4 +425,24 @@ export async function clearCoachSettings() {
   await setSetting("coachModel", "");
   await setSetting("coachBaseUrl", "");
   await setSetting("coachApiKey", "");
+}
+
+// --- Progress photos (metadata; bytes are written to disk separately) ---
+
+export async function createProgressPhoto(input: {
+  id: string;
+  mimeType: string;
+  takenAt?: Date;
+  note?: string | null;
+}) {
+  await db.insert(progressPhotos).values({
+    id: input.id,
+    mimeType: input.mimeType,
+    note: input.note?.trim() || null,
+    ...(input.takenAt ? { takenAt: input.takenAt } : {}),
+  });
+}
+
+export async function deleteProgressPhoto(id: string) {
+  await db.delete(progressPhotos).where(eq(progressPhotos.id, id));
 }

@@ -31,9 +31,11 @@ import {
   deleteBodyweight,
   saveCoachSettings,
   clearCoachSettings,
+  deleteProgressPhoto,
 } from "@/lib/mutations";
 import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach } from "@/lib/coach-stream";
+import { deletePhotoFile } from "@/lib/photo-storage";
 import type { ExerciseType } from "@/db/schema";
 
 // --- Auth ---
@@ -275,6 +277,14 @@ export async function disconnectCoachAction() {
   await clearCoachSettings();
   revalidatePath("/settings");
   revalidatePath("/coach");
+}
+
+// --- Progress photos ---
+
+export async function deletePhotoAction(input: { id: string }) {
+  await deleteProgressPhoto(input.id);
+  await deletePhotoFile(input.id);
+  revalidatePath("/photos");
 }
 
 /** Live check of the currently-saved provider — used by the Settings "Test" button. */

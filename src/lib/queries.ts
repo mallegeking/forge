@@ -8,6 +8,7 @@ import {
   setLogs,
   sessionExerciseNotes,
   bodyweightLogs,
+  progressPhotos,
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, ne } from "drizzle-orm";
@@ -428,4 +429,21 @@ export async function getBodyweightEntries() {
     .select()
     .from(bodyweightLogs)
     .orderBy(asc(bodyweightLogs.measuredAt));
+}
+
+/** Progress photos, newest first (for the gallery). */
+export async function getProgressPhotos() {
+  return db
+    .select()
+    .from(progressPhotos)
+    .orderBy(desc(progressPhotos.takenAt));
+}
+
+/** One photo's metadata — for serving its bytes with the right content type. */
+export async function getPhoto(id: string) {
+  const [photo] = await db
+    .select()
+    .from(progressPhotos)
+    .where(eq(progressPhotos.id, id));
+  return photo ?? null;
 }

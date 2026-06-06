@@ -157,6 +157,20 @@ export const bodyweightLogs = sqliteTable("bodyweight_logs", {
     .$defaultFn(() => new Date()),
 });
 
+// Progress photos — the image bytes live on disk (see lib/photo-storage); this
+// row holds the metadata and is the source of truth for what exists.
+export const progressPhotos = sqliteTable("progress_photos", {
+  id: text("id").primaryKey(),
+  mimeType: text("mime_type").notNull(),
+  takenAt: integer("taken_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  note: text("note"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type Program = typeof programs.$inferSelect;
 export type ProgramDay = typeof programDays.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
@@ -165,3 +179,4 @@ export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
 export type SessionExerciseNote = typeof sessionExerciseNotes.$inferSelect;
 export type BodyweightLog = typeof bodyweightLogs.$inferSelect;
+export type ProgressPhoto = typeof progressPhotos.$inferSelect;
