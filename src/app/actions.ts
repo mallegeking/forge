@@ -31,6 +31,7 @@ import {
   deleteBodyweight,
   saveCoachSettings,
   clearCoachSettings,
+  saveNutritionConfig,
   deleteProgressPhoto,
 } from "@/lib/mutations";
 import { getCoachProvider } from "@/lib/coach-config";
@@ -277,6 +278,19 @@ export async function disconnectCoachAction() {
   await clearCoachSettings();
   revalidatePath("/settings");
   revalidatePath("/coach");
+}
+
+// --- Nutrition ---
+
+export async function saveNutritionAction(input: {
+  activity: string;
+  goal: string;
+  calorieOverride?: string | null;
+  proteinOverride?: string | null;
+  preferences?: string | null;
+}) {
+  await saveNutritionConfig(input);
+  revalidatePath("/nutrition");
 }
 
 // --- Progress photos ---

@@ -427,6 +427,27 @@ export async function clearCoachSettings() {
   await setSetting("coachApiKey", "");
 }
 
+// --- Nutrition config (saved in the key/value settings table) ---
+
+export async function saveNutritionConfig(input: {
+  activity: string;
+  goal: string;
+  /** Empty/zero clears the override so targets fall back to auto. */
+  calorieOverride?: string | number | null;
+  proteinOverride?: string | number | null;
+  preferences?: string | null;
+}) {
+  const num = (v: string | number | null | undefined): string => {
+    const n = typeof v === "string" ? Number(v) : v ?? 0;
+    return Number.isFinite(n) && (n as number) > 0 ? String(Math.round(n as number)) : "";
+  };
+  await setSetting("nutritionActivity", input.activity.trim());
+  await setSetting("nutritionGoal", input.goal.trim());
+  await setSetting("nutritionCalorieOverride", num(input.calorieOverride));
+  await setSetting("nutritionProteinOverride", num(input.proteinOverride));
+  await setSetting("nutritionPreferences", input.preferences?.trim() ?? "");
+}
+
 // --- Progress photos (metadata; bytes are written to disk separately) ---
 
 export async function createProgressPhoto(input: {

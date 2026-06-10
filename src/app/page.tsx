@@ -25,6 +25,7 @@ import {
   Scale,
   Settings,
   Camera,
+  UtensilsCrossed,
 } from "lucide-react";
 
 // Reads the database and resolves "today" — must render per request, never
@@ -177,6 +178,23 @@ export default async function Home() {
           <p className="text-sm font-medium">Bodyweight</p>
           <p className="text-xs text-muted-foreground">
             Log weigh-ins · weekly average &amp; trend
+          </p>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </Link>
+
+      {/* Nutrition entry */}
+      <Link
+        href="/nutrition"
+        className="mb-5 flex items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40"
+      >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <UtensilsCrossed className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Nutrition</p>
+          <p className="text-xs text-muted-foreground">
+            Daily targets &amp; AI grocery recommendations
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
