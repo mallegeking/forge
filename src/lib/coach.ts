@@ -128,3 +128,54 @@ export function buildCoachingBrief(snap: CoachingSnapshot): string {
   const body = withHistory.map(formatExercise).join("\n");
   return `${head}\n\nExercises (most-recent sessions first):\n${body}`;
 }
+
+// --- Proactive coach's note ------------------------------------------------
+//
+// A glanceable home-screen note the coach surfaces unprompted. It's derived
+// from the same progression flags the brief uses — so it needs NO model call
+// and costs nothing per page load. Output is structured (no prose): the UI
+// renders it in the active language. Tapping through to /coach is where the
+// model actually phrases advice.
+
+/** An exercise that hit the top of its range everywhere — ready for more load. */
+export type CoachNoteReady = { name: string; incMin: number; incMax: number };
+/** An exercise stuck at the same load without topping the range. */
+export type CoachNotePlateau = { name: string; sessions: number };
+
+export type CoachNote = {
+  ready: CoachNoteReady[];
+  plateau: CoachNotePlateau[];
+};
+
+/**
+ * Build the proactive note, or `null` when there's nothing actionable to say
+ * (no history yet, a deload week — the home hero already flags that — or every
+ * lift is still mid-progression). Ready and plateau are mutually exclusive per
+ * exercise, mirroring the brief's "ready first" priority.
+ */
+export function buildCoachNote(snap: CoachingSnapshot): CoachNote | null {
+  // During a deload the home hero already shows a banner, and we hold load
+  // back — so a "ready to add weight" note would be the wrong message.
+  if (snap.isDeload) return null;
+
+  const ready: CoachNoteReady[] = [];
+  const plateau: CoachNotePlateau[] = [];
+
+  for (const ex of snap.exercises) {
+    if (ex.sessions.length === 0) continue;
+    const latest = ex.sessions[0];
+    if (isReadyToIncrease(latest.sets, ex.rx)) {
+      const inc = suggestIncrement(ex.type);
+      ready.push({ name: ex.name, incMin: inc.min, incMax: inc.max });
+      continue;
+    }
+    const summaries = ex.sessions.map((s) =>
+      summarizeExerciseSession(s.sets, ex.rx),
+    );
+    const p = detectPlateau(summaries);
+    if (p.isPlateau) plateau.push({ name: ex.name, sessions: p.consecutive });
+  }
+
+  if (ready.length === 0 && plateau.length === 0) return null;
+  return { ready, plateau };
+}

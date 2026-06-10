@@ -104,6 +104,14 @@ export const en = {
     send: "Send",
   },
 
+  coachNote: {
+    title: "Coach's note",
+    readyToAdd: "ready to add",
+    stuck: "stuck",
+    sessions: "sessions",
+    ask: "Ask your coach →",
+  },
+
   bodyweight: {
     title: "Bodyweight",
     subtitle: "Weekly average & trend",

@@ -3,10 +3,12 @@ import {
   getActiveProgram,
   getProgramDays,
   getProgramDayCounts,
+  getCoachingInput,
   isoWeekday,
 } from "@/lib/queries";
 import { getSetting } from "@/lib/mutations";
 import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
+import { buildCoachNote } from "@/lib/coach";
 import { getDict } from "@/lib/i18n/server";
 import {
   startSessionAction,
@@ -48,12 +50,33 @@ export default async function Home() {
     );
   }
 
-  const [days, counts, startIso, postponedWeek] = await Promise.all([
+  const [days, counts, startIso, postponedWeek, snapshot] = await Promise.all([
     getProgramDays(program.id),
     getProgramDayCounts(program.id),
     getSetting("trainingStartDate"),
     getSetting("deloadPostponedWeek"),
+    getCoachingInput(),
   ]);
+
+  // Proactive, no-AI coach note derived from progression flags. Plateaus first
+  // (problems worth acting on), then lifts ready for more load — capped short.
+  const note = snapshot ? buildCoachNote(snapshot) : null;
+  const noteItems = note
+    ? [
+        ...note.plateau.map((p) => ({
+          key: `p-${p.name}`,
+          name: p.name,
+          detail: `${t.coachNote.stuck} ${p.sessions} ${t.coachNote.sessions}`,
+          accent: "text-amber-500",
+        })),
+        ...note.ready.map((r) => ({
+          key: `r-${r.name}`,
+          name: r.name,
+          detail: `${t.coachNote.readyToAdd} ${r.incMin}–${r.incMax} kg`,
+          accent: "text-success",
+        })),
+      ].slice(0, 3)
+    : [];
 
   const today = isoWeekday();
   const todayDay = days.find((d) => d.dayOfWeek === today) ?? null;
@@ -151,22 +174,53 @@ export default async function Home() {
         )}
       </Card>
 
-      {/* Coach entry */}
-      <Link
-        href="/coach"
-        className="mb-5 flex items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40"
-      >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Sparkles className="size-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{t.home.coachTitle}</p>
-          <p className="text-xs text-muted-foreground">
-            {t.home.coachSubtitle}
-          </p>
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-      </Link>
+      {/* Coach entry — a proactive note when there's something to act on,
+          otherwise the plain entry. Tapping through gets AI-phrased advice. */}
+      {noteItems.length > 0 ? (
+        <Link
+          href={`/coach?ask=${encodeURIComponent(t.coach.analyzePrompt)}`}
+          className="mb-5 block rounded-xl bg-card p-3.5 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40"
+        >
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Sparkles className="size-4" />
+            </div>
+            <p className="text-sm font-medium">{t.coachNote.title}</p>
+          </div>
+          <ul className="mt-2.5 flex flex-col gap-1.5">
+            {noteItems.map((item) => (
+              <li key={item.key} className="flex items-baseline gap-2 text-sm">
+                <span
+                  className={`mt-1.5 size-1.5 shrink-0 rounded-full ${item.accent === "text-success" ? "bg-success" : "bg-amber-500"}`}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium">{item.name}</span>
+                  <span className="text-muted-foreground"> — {item.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <span className="mt-3 inline-block text-xs font-medium text-primary">
+            {t.coachNote.ask}
+          </span>
+        </Link>
+      ) : (
+        <Link
+          href="/coach"
+          className="mb-5 flex items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10 transition-colors hover:bg-muted/40"
+        >
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <Sparkles className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{t.home.coachTitle}</p>
+            <p className="text-xs text-muted-foreground">
+              {t.home.coachSubtitle}
+            </p>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
 
       {/* Bodyweight entry */}
       <Link

@@ -102,6 +102,14 @@ export const de: Dictionary = {
     send: "Senden",
   },
 
+  coachNote: {
+    title: "Notiz vom Coach",
+    readyToAdd: "bereit für",
+    stuck: "festgefahren seit",
+    sessions: "Einheiten",
+    ask: "Frag deinen Coach →",
+  },
+
   bodyweight: {
     title: "Körpergewicht",
     subtitle: "Wochenschnitt & Trend",

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildCoachingBrief,
+  buildCoachNote,
   type CoachingSnapshot,
   type SnapshotSession,
 } from "./coach";
@@ -114,6 +115,76 @@ describe("buildCoachingBrief — bounded session history", () => {
     });
     expect(brief).toContain("20kg"); // newest survives
     expect(brief).not.toContain("1kg"); // oldest (beyond the cap) is dropped
+  });
+});
+
+describe("buildCoachNote", () => {
+  const readyEx = {
+    name: "Squat",
+    type: "compound" as const,
+    injuryNote: null,
+    rx: compound,
+    sessions: [session(100, [8, 8, 8], 0)],
+  };
+  const plateauEx = {
+    name: "Bench Press",
+    type: "compound" as const,
+    injuryNote: null,
+    rx: compound,
+    sessions: [
+      session(40, [7, 7, 6], 0),
+      session(40, [7, 7, 6], 2),
+      session(40, [6, 7, 6], 4),
+    ],
+  };
+  const buildingEx = {
+    name: "Row",
+    type: "compound" as const,
+    injuryNote: null,
+    rx: compound,
+    sessions: [session(60, [6, 6, 6], 0)],
+  };
+
+  it("collects ready and plateaued lifts", () => {
+    const note = buildCoachNote({
+      programName: "PPL",
+      weekNumber: 2,
+      isDeload: false,
+      exercises: [readyEx, plateauEx, buildingEx],
+    });
+    expect(note).not.toBeNull();
+    expect(note!.ready.map((r) => r.name)).toEqual(["Squat"]);
+    expect(note!.ready[0].incMin).toBeGreaterThan(0);
+    expect(note!.plateau).toEqual([{ name: "Bench Press", sessions: 3 }]);
+  });
+
+  it("returns null on a deload week (the hero already flags it)", () => {
+    const note = buildCoachNote({
+      programName: "PPL",
+      weekNumber: 4,
+      isDeload: true,
+      exercises: [readyEx, plateauEx],
+    });
+    expect(note).toBeNull();
+  });
+
+  it("returns null when nothing is actionable", () => {
+    const note = buildCoachNote({
+      programName: "PPL",
+      weekNumber: 1,
+      isDeload: false,
+      exercises: [
+        buildingEx,
+        {
+          name: "Curl",
+          type: "isolation",
+          injuryNote: null,
+          rx: isolation,
+          sessions: [], // no history → skipped
+        },
+      ],
+    });
+    expect(note).toBeNull();
   });
 });
 
