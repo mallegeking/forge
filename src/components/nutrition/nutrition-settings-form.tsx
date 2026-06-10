@@ -7,21 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SlidersHorizontal, Check } from "lucide-react";
 import { saveNutritionAction } from "@/app/actions";
+import { useT } from "@/components/i18n/i18n-provider";
 import type { ActivityLevel, Goal } from "@/lib/nutrition";
 
-const ACTIVITIES: { id: ActivityLevel; label: string }[] = [
-  { id: "sedentary", label: "Sedentary" },
-  { id: "light", label: "Light" },
-  { id: "moderate", label: "Moderate" },
-  { id: "active", label: "Active" },
-  { id: "very_active", label: "Very active" },
+const ACTIVITY_IDS: ActivityLevel[] = [
+  "sedentary",
+  "light",
+  "moderate",
+  "active",
+  "very_active",
 ];
-
-const GOALS: { id: Goal; label: string }[] = [
-  { id: "cut", label: "Cut" },
-  { id: "maintain", label: "Maintain" },
-  { id: "gain", label: "Lean gain" },
-];
+const GOAL_IDS: Goal[] = ["cut", "maintain", "gain"];
 
 type Current = {
   activity: ActivityLevel;
@@ -32,6 +28,7 @@ type Current = {
 };
 
 export function NutritionSettingsForm({ current }: { current: Current }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [activity, setActivity] = useState<ActivityLevel>(current.activity);
   const [goal, setGoal] = useState<Goal>(current.goal);
@@ -67,7 +64,7 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
         className="w-full gap-1.5"
       >
         <SlidersHorizontal className="size-4" />
-        Adjust targets
+        {t.nutrition.adjustTargets}
       </Button>
     );
   }
@@ -76,18 +73,18 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
     <Card className="gap-4 p-4">
       <div>
         <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Activity
+          {t.nutrition.activity}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {ACTIVITIES.map((a) => (
+          {ACTIVITY_IDS.map((id) => (
             <Button
-              key={a.id}
+              key={id}
               type="button"
               size="sm"
-              variant={activity === a.id ? "default" : "outline"}
-              onClick={() => setActivity(a.id)}
+              variant={activity === id ? "default" : "outline"}
+              onClick={() => setActivity(id)}
             >
-              {a.label}
+              {t.nutrition.activityLabels[id]}
             </Button>
           ))}
         </div>
@@ -95,18 +92,18 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
 
       <div>
         <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Goal
+          {t.nutrition.goalLabel}
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {GOALS.map((g) => (
+          {GOAL_IDS.map((id) => (
             <Button
-              key={g.id}
+              key={id}
               type="button"
               size="sm"
-              variant={goal === g.id ? "default" : "outline"}
-              onClick={() => setGoal(g.id)}
+              variant={goal === id ? "default" : "outline"}
+              onClick={() => setGoal(id)}
             >
-              {g.label}
+              {t.nutrition.goalLabels[id]}
             </Button>
           ))}
         </div>
@@ -115,27 +112,33 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
       <div className="flex gap-3">
         <label className="flex flex-1 flex-col gap-1">
           <span className="text-xs text-muted-foreground">
-            Calories <span className="text-muted-foreground/70">(override)</span>
+            {t.nutrition.caloriesOverride}{" "}
+            <span className="text-muted-foreground/70">
+              {t.nutrition.overrideHint}
+            </span>
           </span>
           <Input
             type="number"
             inputMode="numeric"
             value={calorie}
             onChange={(e) => setCalorie(e.target.value)}
-            placeholder="auto"
+            placeholder={t.nutrition.auto}
             className="h-11"
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">
           <span className="text-xs text-muted-foreground">
-            Protein g <span className="text-muted-foreground/70">(override)</span>
+            {t.nutrition.proteinOverride}{" "}
+            <span className="text-muted-foreground/70">
+              {t.nutrition.overrideHint}
+            </span>
           </span>
           <Input
             type="number"
             inputMode="numeric"
             value={protein}
             onChange={(e) => setProtein(e.target.value)}
-            placeholder="auto"
+            placeholder={t.nutrition.auto}
             className="h-11"
           />
         </label>
@@ -143,12 +146,12 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
 
       <label className="flex flex-col gap-1">
         <span className="text-xs text-muted-foreground">
-          Preferences / restrictions
+          {t.nutrition.preferences}
         </span>
         <Textarea
           value={preferences}
           onChange={(e) => setPreferences(e.target.value)}
-          placeholder="e.g. vegetarian, no dairy, on a budget"
+          placeholder={t.nutrition.preferencesPlaceholder}
           rows={2}
           className="resize-none"
         />
@@ -157,16 +160,15 @@ export function NutritionSettingsForm({ current }: { current: Current }) {
       <div className="flex items-center gap-2">
         <Button type="button" onClick={save} disabled={pending} className="flex-1 gap-1.5">
           {saved && <Check className="size-4" />}
-          {saved ? "Saved" : "Save"}
+          {saved ? t.common.saved : t.common.save}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Done
+          {t.common.done}
         </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Targets are auto-computed from your latest bodyweight. Leave the overrides
-        blank to follow the estimate.
+        {t.nutrition.autoComputedHint}
       </p>
     </Card>
   );

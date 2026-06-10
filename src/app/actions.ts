@@ -34,6 +34,7 @@ import {
   saveNutritionConfig,
   deleteProgressPhoto,
 } from "@/lib/mutations";
+import { LOCALE_COOKIE, isLocale } from "@/lib/i18n/config";
 import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach } from "@/lib/coach-stream";
 import { deletePhotoFile } from "@/lib/photo-storage";
@@ -64,6 +65,20 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete(AUTH_COOKIE);
   redirect("/login");
+}
+
+// --- Locale ---
+
+export async function setLocaleAction(locale: string) {
+  if (!isLocale(locale)) return;
+  const cookieStore = await cookies();
+  cookieStore.set(LOCALE_COOKIE, locale, {
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365, // 1 year
+  });
+  // The locale shapes every rendered page, so refresh the whole tree.
+  revalidatePath("/", "layout");
 }
 
 // --- Training sessions ---

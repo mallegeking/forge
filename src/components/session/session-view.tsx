@@ -7,9 +7,11 @@ import { RestTimerProvider } from "@/components/session/rest-timer";
 import { ExerciseCard } from "@/components/session/exercise-card";
 import { Button } from "@/components/ui/button";
 import { finishSessionAction } from "@/app/actions";
+import { useT } from "@/components/i18n/i18n-provider";
 import type { SessionView as SessionViewData } from "@/lib/queries";
 
 export function SessionView({ view }: { view: SessionViewData }) {
+  const t = useT();
   useWakeLock();
   const completed = view.session.completedAt != null;
 
@@ -18,7 +20,7 @@ export function SessionView({ view }: { view: SessionViewData }) {
       <header className="mb-4 flex items-center gap-2">
         <Link
           href="/"
-          aria-label="Back"
+          aria-label={t.common.back}
           className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ChevronLeft className="size-5" />
@@ -28,9 +30,9 @@ export function SessionView({ view }: { view: SessionViewData }) {
             {view.dayName}
           </h1>
           <p className="text-xs text-muted-foreground">
-            Week {view.session.weekNumber}
-            {view.session.isDeload && " · deload"}
-            {completed && " · completed"}
+            {t.session.week} {view.session.weekNumber}
+            {view.session.isDeload && ` · ${t.session.deload}`}
+            {completed && ` · ${t.session.completed}`}
           </p>
         </div>
         {completed && <CheckCircle2 className="size-5 text-success" />}
@@ -51,7 +53,7 @@ export function SessionView({ view }: { view: SessionViewData }) {
         <form action={finishSessionAction} className="mt-4">
           <input type="hidden" name="sessionId" value={view.session.id} />
           <Button type="submit" variant="secondary" className="h-12 w-full text-base">
-            Finish session
+            {t.session.finish}
           </Button>
         </form>
       )}

@@ -23,6 +23,7 @@ import {
 } from "@/lib/progression";
 import { formatSet, formatWeight, formatRelativeDay } from "@/lib/format";
 import { logSetAction, deleteSetAction, saveNoteAction } from "@/app/actions";
+import { useT, useLocale } from "@/components/i18n/i18n-provider";
 import type { SessionExerciseView, LoggedSetRow } from "@/lib/queries";
 
 export function ExerciseCard({
@@ -34,6 +35,8 @@ export function ExerciseCard({
   sessionId: string;
   isDeload?: boolean;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { startRest } = useRestTimer();
   const [, startTransition] = useTransition();
   const [sets, setSets] = useState<LoggedSetRow[]>(ex.loggedSets);
@@ -116,9 +119,9 @@ export function ExerciseCard({
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
           </Link>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {deload ? deload.targetSets : ex.targetSets} sets · {ex.repMin}–
-            {ex.repMax} reps · <span className="capitalize">{ex.type}</span>
-            {deload && <span className="text-primary"> · deload</span>}
+            {deload ? deload.targetSets : ex.targetSets} {t.session.sets} · {ex.repMin}–
+            {ex.repMax} {t.session.reps} · <span>{t.exerciseTypes[ex.type]}</span>
+            {deload && <span className="text-primary"> · {t.session.deload}</span>}
           </p>
         </div>
       </div>
@@ -134,8 +137,8 @@ export function ExerciseCard({
         <div className="mx-4 flex items-center gap-2 rounded-lg bg-muted p-2.5 text-xs text-muted-foreground">
           <Moon className="size-4 shrink-0" />
           <span>
-            Deload — about {Math.round(deload.loadFactor * 100)}% load,{" "}
-            {deload.targetSets} sets. Keep it easy.
+            {t.session.deloadNotice1} {Math.round(deload.loadFactor * 100)}%{" "}
+            {t.session.deloadNotice2} {deload.targetSets} {t.session.deloadNotice3}
           </span>
         </div>
       )}
@@ -143,13 +146,14 @@ export function ExerciseCard({
       <div className="px-4 text-xs text-muted-foreground">
         {ex.lastSession ? (
           <span>
-            Last time · {formatRelativeDay(ex.lastSession.performedAt)} ·{" "}
+            {t.session.lastTime}{" "}
+            {formatRelativeDay(ex.lastSession.performedAt, t.common, locale)} ·{" "}
             <span className="text-foreground">
               {ex.lastSession.sets.map((s) => formatSet(s.weightKg, s.reps)).join(", ")}
             </span>
           </span>
         ) : (
-          <span>First time logging this exercise</span>
+          <span>{t.session.firstTime}</span>
         )}
       </div>
 
@@ -162,13 +166,15 @@ export function ExerciseCard({
               className="flex items-center justify-between rounded-lg bg-muted/50 py-1.5 pr-1.5 pl-3 text-sm"
             >
               <span className="tabular-nums">
-                <span className="text-muted-foreground">Set {i + 1}</span>{" "}
+                <span className="text-muted-foreground">
+                  {t.session.set} {i + 1}
+                </span>{" "}
                 <span className="font-medium">{formatSet(s.weightKg, s.reps)}</span>
               </span>
               <button
                 type="button"
                 onClick={() => removeSet(s.id)}
-                aria-label={`Delete set ${i + 1}`}
+                aria-label={`${t.session.deleteSet} ${i + 1}`}
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
               >
                 <Trash2 className="size-4" />
@@ -182,7 +188,8 @@ export function ExerciseCard({
         <div className="mx-4 flex items-center gap-2 rounded-lg bg-success/10 p-2.5 text-xs text-success">
           <TrendingUp className="size-4 shrink-0" />
           <span>
-            All sets hit the top — add {formatWeight(inc.min)}–{formatWeight(inc.max)}kg next session.
+            {t.session.readyPrefix} {formatWeight(inc.min)}–{formatWeight(inc.max)}
+            {t.session.readySuffix}
           </span>
         </div>
       )}
@@ -190,7 +197,7 @@ export function ExerciseCard({
       {/* Logger */}
       <div className="mx-4 flex items-end gap-2">
         <Stepper
-          label="kg"
+          label={t.session.kg}
           value={weight}
           step={2.5}
           min={0}
@@ -198,7 +205,7 @@ export function ExerciseCard({
           onChange={setWeight}
         />
         <Stepper
-          label="reps"
+          label={t.session.reps}
           value={reps}
           step={1}
           min={0}
@@ -211,7 +218,7 @@ export function ExerciseCard({
           className="h-11 flex-1 gap-1 text-sm font-medium"
         >
           <Plus className="size-4" />
-          Add set
+          {t.session.addSet}
         </Button>
       </div>
 
@@ -220,7 +227,7 @@ export function ExerciseCard({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           onBlur={saveNote}
-          placeholder="Notes (e.g. shoulder felt off, easy today)…"
+          placeholder={t.session.notePlaceholder}
           className="min-h-0 resize-none text-sm"
           rows={1}
         />
@@ -244,6 +251,7 @@ function Stepper({
   inputMode: "decimal" | "numeric";
   onChange: (v: number) => void;
 }) {
+  const t = useT();
   const clamp = (v: number) => {
     const n = Number.isFinite(v) ? v : min;
     return Math.max(min, Math.round(n * 100) / 100);
@@ -254,7 +262,7 @@ function Stepper({
       <div className="flex items-center gap-1">
         <button
           type="button"
-          aria-label={`Decrease ${label}`}
+          aria-label={`${t.session.decrease} ${label}`}
           onClick={() => onChange(clamp(value - step))}
           className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground active:translate-y-px"
         >
@@ -270,7 +278,7 @@ function Stepper({
         />
         <button
           type="button"
-          aria-label={`Increase ${label}`}
+          aria-label={`${t.session.increase} ${label}`}
           onClick={() => onChange(clamp(value + step))}
           className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground active:translate-y-px"
         >

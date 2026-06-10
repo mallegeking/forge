@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Camera, Loader2 } from "lucide-react";
+import { useT } from "@/components/i18n/i18n-provider";
 
 function todayStr(): string {
   const d = new Date();
@@ -14,6 +15,7 @@ function todayStr(): string {
 }
 
 export function PhotoUploader() {
+  const t = useT();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -36,10 +38,10 @@ export function PhotoUploader() {
         const body = await res.json().catch(() => ({}));
         setError(
           body.error === "too_large"
-            ? "That image is too large (max 12 MB)."
+            ? t.photos.tooLarge
             : body.error === "no_image"
-              ? "Please choose an image file."
-              : "Upload failed — try again."
+              ? t.photos.noImage
+              : t.photos.uploadFailed
         );
         return;
       }
@@ -49,7 +51,7 @@ export function PhotoUploader() {
       if (fileRef.current) fileRef.current.value = "";
       router.refresh();
     } catch {
-      setError("Upload failed — try again.");
+      setError(t.photos.uploadFailed);
     } finally {
       setUploading(false);
     }
@@ -67,7 +69,7 @@ export function PhotoUploader() {
       />
       <div className="flex items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Date</span>
+          <span className="text-xs text-muted-foreground">{t.photos.date}</span>
           <Input
             type="date"
             value={date}
@@ -79,7 +81,7 @@ export function PhotoUploader() {
         <Input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Note (optional)"
+          placeholder={t.photos.notePlaceholder}
           className="h-11 flex-1"
         />
       </div>
@@ -90,7 +92,7 @@ export function PhotoUploader() {
         ) : (
           <Camera className="size-4" />
         )}
-        {uploading ? "Uploading…" : "Add photo"}
+        {uploading ? t.photos.uploading : t.photos.addPhoto}
       </Button>
     </Card>
   );

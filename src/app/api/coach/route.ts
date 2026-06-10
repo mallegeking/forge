@@ -11,6 +11,8 @@ import { getCoachingInput } from "@/lib/queries";
 import { buildCoachingBrief, COACH_SYSTEM_PROMPT } from "@/lib/coach";
 import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach, type CoachMessage } from "@/lib/coach-stream";
+import { getLocale, getDict } from "@/lib/i18n/server";
+import { LANGUAGE_DIRECTIVE } from "@/lib/i18n/config";
 
 // Reads the DB + env per request; never prerender.
 export const dynamic = "force-dynamic";
@@ -46,11 +48,15 @@ export async function POST(request: Request) {
   }
 
   // Build the brief from the active program. Pure data → no model call yet.
-  const snapshot = await getCoachingInput();
+  const [snapshot, locale, t] = await Promise.all([
+    getCoachingInput(),
+    getLocale(),
+    getDict(),
+  ]);
   const brief = snapshot
     ? buildCoachingBrief(snapshot)
     : "No active program is loaded yet — guide the athlete on getting set up.";
-  const system = `${COACH_SYSTEM_PROMPT}\n\nAthlete's current data:\n${brief}`;
+  const system = `${COACH_SYSTEM_PROMPT}\n\nAthlete's current data:\n${brief}${LANGUAGE_DIRECTIVE[locale]}`;
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream<Uint8Array>({
@@ -64,11 +70,7 @@ export async function POST(request: Request) {
         // The 200 headers are already sent, so we can't switch to an error
         // status — surface a readable note in-stream instead of a hard break.
         console.error("[coach] stream error", err);
-        controller.enqueue(
-          encoder.encode(
-            "\n\n⚠️ The coach hit an error reaching the model. Please try again."
-          )
-        );
+        controller.enqueue(encoder.encode(t.common.aiStreamError));
         controller.close();
       }
     },

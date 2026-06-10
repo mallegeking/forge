@@ -6,6 +6,7 @@ import { weeklyAverages, bodyweightTrend } from "@/lib/bodyweight";
 import { LineChart } from "@/components/charts/line-chart";
 import { Card } from "@/components/ui/card";
 import { formatWeight } from "@/lib/format";
+import { getDict } from "@/lib/i18n/server";
 import { BodyweightTracker } from "@/components/bodyweight/bodyweight-tracker";
 
 export const metadata: Metadata = { title: "Bodyweight · Forge" };
@@ -14,7 +15,7 @@ export const metadata: Metadata = { title: "Bodyweight · Forge" };
 export const dynamic = "force-dynamic";
 
 export default async function BodyweightPage() {
-  const entries = await getBodyweightEntries();
+  const [entries, t] = await Promise.all([getBodyweightEntries(), getDict()]);
   const weekly = weeklyAverages(
     entries.map((e) => ({ weightKg: e.weightKg, measuredAt: e.measuredAt }))
   );
@@ -29,16 +30,18 @@ export default async function BodyweightPage() {
       <header className="mb-4 flex items-center gap-2">
         <Link
           href="/"
-          aria-label="Back"
+          aria-label={t.common.back}
           className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ChevronLeft className="size-5" />
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-semibold tracking-tight">
-            Bodyweight
+            {t.bodyweight.title}
           </h1>
-          <p className="text-xs text-muted-foreground">Weekly average &amp; trend</p>
+          <p className="text-xs text-muted-foreground">
+            {t.bodyweight.subtitle}
+          </p>
         </div>
       </header>
 
@@ -46,7 +49,9 @@ export default async function BodyweightPage() {
         {latest ? (
           <div className="flex items-end justify-between">
             <div>
-              <span className="text-xs text-muted-foreground">Latest</span>
+              <span className="text-xs text-muted-foreground">
+                {t.bodyweight.latest}
+              </span>
               <p className="text-2xl font-semibold tracking-tight tabular-nums">
                 {formatWeight(latest.weightKg)}{" "}
                 <span className="text-base font-normal text-muted-foreground">
@@ -58,13 +63,13 @@ export default async function BodyweightPage() {
               <span className="flex items-center gap-1 text-sm text-muted-foreground tabular-nums">
                 <TrendIcon className="size-4" />
                 {trend > 0 ? "+" : ""}
-                {formatWeight(trend)} kg · {weekly.length} wks
+                {formatWeight(trend)} kg · {weekly.length} {t.bodyweight.weeksShort}
               </span>
             )}
           </div>
         ) : (
           <p className="py-2 text-center text-sm text-muted-foreground">
-            Log your first weigh-in below to start tracking.
+            {t.bodyweight.empty}
           </p>
         )}
       </Card>
@@ -73,12 +78,9 @@ export default async function BodyweightPage() {
         <Card className="mb-4 py-4">
           <div className="px-4">
             <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Weekly average
+              {t.bodyweight.weeklyAverage}
             </p>
-            <LineChart
-              data={chartData}
-              ariaLabel="Bodyweight weekly average over time"
-            />
+            <LineChart data={chartData} ariaLabel={t.bodyweight.chartLabel} />
           </div>
         </Card>
       )}

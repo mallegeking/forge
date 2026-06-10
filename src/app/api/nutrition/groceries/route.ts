@@ -13,6 +13,8 @@ import { getCoachProvider } from "@/lib/coach-config";
 import { getNutritionConfig } from "@/lib/nutrition-config";
 import { NUTRITION_SYSTEM_PROMPT, buildNutritionBrief } from "@/lib/nutrition";
 import { streamCoach, type CoachMessage } from "@/lib/coach-stream";
+import { getLocale, getDict } from "@/lib/i18n/server";
+import { LANGUAGE_DIRECTIVE } from "@/lib/i18n/config";
 
 // Reads the DB + env per request; never prerender.
 export const dynamic = "force-dynamic";
@@ -52,7 +54,11 @@ export async function POST(request: Request) {
   }
 
   // Training context reuses the coach's brief (pure, no extra model call).
-  const snapshot = await getCoachingInput();
+  const [snapshot, locale, t] = await Promise.all([
+    getCoachingInput(),
+    getLocale(),
+    getDict(),
+  ]);
   const trainingSummary = snapshot ? buildCoachingBrief(snapshot) : null;
 
   const brief = buildNutritionBrief({
@@ -64,7 +70,7 @@ export async function POST(request: Request) {
     trainingSummary,
     preferences: config.preferences || null,
   });
-  const system = `${NUTRITION_SYSTEM_PROMPT}\n\nAthlete's data:\n${brief}`;
+  const system = `${NUTRITION_SYSTEM_PROMPT}\n\nAthlete's data:\n${brief}${LANGUAGE_DIRECTIVE[locale]}`;
 
   const ask =
     "Generate this week's grocery list and 2–3 meal ideas that hit my targets." +
@@ -82,11 +88,7 @@ export async function POST(request: Request) {
       } catch (err) {
         // 200 headers are already sent — surface a readable note in-stream.
         console.error("[nutrition] stream error", err);
-        controller.enqueue(
-          encoder.encode(
-            "\n\n⚠️ Hit an error reaching the model. Please try again."
-          )
-        );
+        controller.enqueue(encoder.encode(t.common.aiStreamError));
         controller.close();
       }
     },

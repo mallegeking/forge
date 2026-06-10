@@ -9,6 +9,7 @@ import {
   createExerciseAction,
 } from "@/app/actions";
 import { restSecondsFor } from "@/lib/progression";
+import { useT } from "@/components/i18n/i18n-provider";
 import type { Exercise, ExerciseType } from "@/db/schema";
 
 // New exercises are added with a sensible default prescription; the user tunes
@@ -26,6 +27,7 @@ export function ExercisePicker({
   existingIds: Set<string>;
   onDone: () => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -62,11 +64,11 @@ export function ExercisePicker({
     <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Add exercise
+          {t.program.addExercise}
         </span>
         <button
           type="button"
-          aria-label="Close"
+          aria-label={t.program.close}
           onClick={onDone}
           className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
         >
@@ -80,20 +82,20 @@ export function ExercisePicker({
             autoFocus
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Exercise name"
+            placeholder={t.program.exerciseName}
             className="h-9"
           />
           <div className="flex gap-1.5">
-            {(["compound", "isolation"] as const).map((t) => (
+            {(["compound", "isolation"] as const).map((type) => (
               <Button
-                key={t}
+                key={type}
                 type="button"
                 size="sm"
-                variant={newType === t ? "default" : "outline"}
-                onClick={() => setNewType(t)}
-                className="flex-1 capitalize"
+                variant={newType === type ? "default" : "outline"}
+                onClick={() => setNewType(type)}
+                className="flex-1"
               >
-                {t}
+                {t.exerciseTypes[type]}
               </Button>
             ))}
           </div>
@@ -105,7 +107,7 @@ export function ExercisePicker({
               onClick={() => setCreating(false)}
               className="flex-1"
             >
-              Back
+              {t.program.back}
             </Button>
             <Button
               type="button"
@@ -114,7 +116,7 @@ export function ExercisePicker({
               disabled={pending || !newName.trim()}
               className="flex-1"
             >
-              Create &amp; add
+              {t.program.createAndAdd}
             </Button>
           </div>
         </div>
@@ -123,7 +125,7 @@ export function ExercisePicker({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search library…"
+            placeholder={t.program.searchLibrary}
             className="mb-2 h-9"
           />
           <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">
@@ -136,15 +138,15 @@ export function ExercisePicker({
                   className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
                 >
                   <span className="truncate">{e.name}</span>
-                  <span className="ml-2 shrink-0 text-xs text-muted-foreground capitalize">
-                    {e.type}
+                  <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                    {t.exerciseTypes[e.type]}
                   </span>
                 </button>
               </li>
             ))}
             {options.length === 0 && (
               <li className="px-1 py-2 text-center text-xs text-muted-foreground">
-                No matching exercises.
+                {t.program.noMatching}
               </li>
             )}
           </ul>
@@ -159,7 +161,7 @@ export function ExercisePicker({
             className="mt-2 w-full gap-1"
           >
             <Plus className="size-3.5" />
-            New exercise
+            {t.program.newExercise}
           </Button>
         </>
       )}

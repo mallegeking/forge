@@ -7,7 +7,7 @@ import {
 } from "@/lib/queries";
 import { getSetting } from "@/lib/mutations";
 import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
-import { weekdayName } from "@/lib/format";
+import { getDict } from "@/lib/i18n/server";
 import {
   startSessionAction,
   logoutAction,
@@ -33,16 +33,16 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const program = await getActiveProgram();
+  const [program, t] = await Promise.all([getActiveProgram(), getDict()]);
 
   if (!program) {
     return (
       <div className="py-20 text-center">
-        <h1 className="text-xl font-semibold">No program loaded</h1>
+        <h1 className="text-xl font-semibold">{t.home.noProgramTitle}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Run{" "}
+          {t.home.noProgramBefore}{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">npm run db:seed</code>{" "}
-          to load your 5-day split.
+          {t.home.noProgramAfter}
         </p>
       </div>
     );
@@ -75,7 +75,7 @@ export default async function Home() {
         <div className="flex items-center gap-1">
           <Link
             href="/settings"
-            aria-label="Settings"
+            aria-label={t.home.settings}
             className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <Settings className="size-4" />
@@ -83,7 +83,7 @@ export default async function Home() {
           <form action={logoutAction}>
             <button
               type="submit"
-              aria-label="Lock app"
+              aria-label={t.home.lockApp}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <LockKeyhole className="size-4" />
@@ -96,12 +96,12 @@ export default async function Home() {
       <Card className="mb-5 gap-0 py-0">
         <div className="flex items-center justify-between px-5 pt-5">
           <span className="text-xs font-medium tracking-wide text-primary uppercase">
-            Today · {weekdayName(today)}
+            {t.home.today} · {t.weekdays[today]}
           </span>
           {week != null && (
             <span className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
               <CalendarRange className="size-3.5" />
-              Week {week}
+              {t.home.week} {week}
             </span>
           )}
         </div>
@@ -110,14 +110,14 @@ export default async function Home() {
           <div className="mx-5 mt-3 flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Moon className="size-3.5 shrink-0" />
-              Deload week — lighter loads, fewer sets.
+              {t.home.deloadNotice}
             </span>
             <form action={postponeDeloadAction}>
               <button
                 type="submit"
                 className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
               >
-                Postpone
+                {t.home.postpone}
               </button>
             </form>
           </div>
@@ -129,21 +129,23 @@ export default async function Home() {
               {todayDay.name}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {counts.get(todayDay.id) ?? 0} exercises
+              {counts.get(todayDay.id) ?? 0} {t.home.exercises}
             </p>
             <form action={startSessionAction} className="mt-4">
               <input type="hidden" name="dayId" value={todayDay.id} />
               <Button type="submit" className="h-12 w-full gap-1.5 text-base">
-                Start workout
+                {t.home.startWorkout}
                 <ChevronRight className="size-4" />
               </Button>
             </form>
           </div>
         ) : (
           <div className="px-5 pt-2 pb-5">
-            <h1 className="text-2xl font-semibold tracking-tight">Rest day</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t.home.restDayTitle}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Recover well — or pick a session below to train anyway.
+              {t.home.restDayBody}
             </p>
           </div>
         )}
@@ -158,9 +160,9 @@ export default async function Home() {
           <Sparkles className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Ask your coach</p>
+          <p className="text-sm font-medium">{t.home.coachTitle}</p>
           <p className="text-xs text-muted-foreground">
-            AI advice from your training history
+            {t.home.coachSubtitle}
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -175,9 +177,9 @@ export default async function Home() {
           <Scale className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Bodyweight</p>
+          <p className="text-sm font-medium">{t.home.bodyweightTitle}</p>
           <p className="text-xs text-muted-foreground">
-            Log weigh-ins · weekly average &amp; trend
+            {t.home.bodyweightSubtitle}
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -192,9 +194,9 @@ export default async function Home() {
           <UtensilsCrossed className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Nutrition</p>
+          <p className="text-sm font-medium">{t.home.nutritionTitle}</p>
           <p className="text-xs text-muted-foreground">
-            Daily targets &amp; AI grocery recommendations
+            {t.home.nutritionSubtitle}
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -209,9 +211,9 @@ export default async function Home() {
           <Camera className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Progress photos</p>
+          <p className="text-sm font-medium">{t.home.photosTitle}</p>
           <p className="text-xs text-muted-foreground">
-            Track visual progress over time
+            {t.home.photosSubtitle}
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -219,7 +221,7 @@ export default async function Home() {
 
       {/* The split */}
       <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        Training split
+        {t.home.trainingSplit}
       </h2>
       <div className="flex flex-col gap-2">
         {days.map((day) => {
@@ -235,13 +237,13 @@ export default async function Home() {
               >
                 <div className="flex w-10 shrink-0 flex-col items-center">
                   <span className="text-[0.65rem] tracking-wide text-muted-foreground uppercase">
-                    {weekdayName(day.dayOfWeek).slice(0, 3)}
+                    {t.weekdaysShort[day.dayOfWeek]}
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{day.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {counts.get(day.id) ?? 0} exercises
+                    {counts.get(day.id) ?? 0} {t.home.exercises}
                   </p>
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -256,7 +258,7 @@ export default async function Home() {
           href="/program"
           className="text-sm text-muted-foreground hover:text-foreground"
         >
-          View full program →
+          {t.home.viewFullProgram}
         </Link>
       </div>
     </div>

@@ -16,7 +16,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { weekdayName } from "@/lib/format";
+import { useT } from "@/components/i18n/i18n-provider";
 import { ExercisePicker } from "@/components/program/exercise-picker";
 import type { DayExercise } from "@/lib/queries";
 import type { Program, ProgramDay, Exercise } from "@/db/schema";
@@ -50,6 +50,7 @@ export function ProgramEditor({
   days: DayBlock[];
   library: Exercise[];
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
 
   return (
@@ -62,7 +63,7 @@ export function ProgramEditor({
           className="gap-1"
         >
           {editing ? <Check className="size-3.5" /> : <Pencil className="size-3.5" />}
-          {editing ? "Done" : "Edit"}
+          {editing ? t.program.done : t.program.edit}
         </Button>
       </div>
 
@@ -90,6 +91,7 @@ export function ProgramEditor({
 // --- View mode -------------------------------------------------------------
 
 function ReadOnlyDays({ days }: { days: DayBlock[] }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-4">
       {days.map(({ day, exercises }) => (
@@ -97,7 +99,7 @@ function ReadOnlyDays({ days }: { days: DayBlock[] }) {
           <div className="flex items-baseline justify-between px-4">
             <h2 className="font-medium">{day.name}</h2>
             <span className="text-xs text-muted-foreground">
-              {weekdayName(day.dayOfWeek)}
+              {t.weekdays[day.dayOfWeek]}
             </span>
           </div>
           <ul className="flex flex-col">
@@ -122,7 +124,7 @@ function ReadOnlyDays({ days }: { days: DayBlock[] }) {
             ))}
             {exercises.length === 0 && (
               <li className="px-4 py-2 text-sm text-muted-foreground">
-                No exercises yet.
+                {t.program.noExercises}
               </li>
             )}
           </ul>
@@ -141,6 +143,7 @@ function ProgramManager({
   program: Program;
   programs: Program[];
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -159,7 +162,7 @@ function ProgramManager({
               run(() => renameProgramAction({ id: program.id, name }));
           }}
           className="h-9 flex-1 font-medium"
-          aria-label="Program name"
+          aria-label={t.program.programName}
         />
         <Button
           variant="ghost"
@@ -167,7 +170,7 @@ function ProgramManager({
           onClick={() => setOpen((o) => !o)}
           className="gap-1"
         >
-          Programs
+          {t.program.programs}
           {open ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         </Button>
       </div>
@@ -183,12 +186,12 @@ function ProgramManager({
                 <span className="truncate">{p.name}</span>
                 {p.isActive && (
                   <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
-                    Active
+                    {t.program.active}
                   </span>
                 )}
                 {p.archivedAt && (
                   <span className="shrink-0 text-[0.65rem] text-muted-foreground">
-                    archived
+                    {t.program.archived}
                   </span>
                 )}
               </span>
@@ -199,14 +202,14 @@ function ProgramManager({
                     size="xs"
                     onClick={() => run(() => setActiveProgramAction({ id: p.id }))}
                   >
-                    Activate
+                    {t.program.activate}
                   </Button>
                 )}
                 {p.archivedAt ? (
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="Restore program"
+                    aria-label={t.program.restoreProgram}
                     onClick={() => run(() => restoreProgramAction({ id: p.id }))}
                   >
                     <RotateCcw className="size-3.5" />
@@ -216,7 +219,7 @@ function ProgramManager({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Archive program"
+                      aria-label={t.program.archiveProgram}
                       onClick={() => run(() => archiveProgramAction({ id: p.id }))}
                     >
                       <Archive className="size-3.5" />
@@ -233,7 +236,7 @@ function ProgramManager({
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="New program name"
+                placeholder={t.program.newProgramName}
                 className="h-8 flex-1"
               />
               <Button
@@ -248,7 +251,7 @@ function ProgramManager({
                   setCreating(false);
                 }}
               >
-                Create
+                {t.program.create}
               </Button>
             </div>
           ) : (
@@ -259,7 +262,7 @@ function ProgramManager({
               className="mt-1 w-full gap-1"
             >
               <Plus className="size-3.5" />
-              New program
+              {t.program.newProgram}
             </Button>
           )}
         </div>
@@ -279,6 +282,7 @@ function EditableDay({
   exercises: DayExercise[];
   library: Exercise[];
 }) {
+  const t = useT();
   const [picking, setPicking] = useState(false);
   const [, startTransition] = useTransition();
   const run = (fn: () => Promise<unknown>) => startTransition(() => void fn());
@@ -295,19 +299,19 @@ function EditableDay({
               run(() => renameDayAction({ id: day.id, name }));
           }}
           className="h-9 flex-1 font-medium"
-          aria-label="Day name"
+          aria-label={t.program.dayName}
         />
         <select
           defaultValue={day.dayOfWeek}
           onChange={(e) =>
             run(() => setDayOfWeekAction({ id: day.id, dayOfWeek: Number(e.target.value) }))
           }
-          aria-label="Day of week"
+          aria-label={t.program.dayOfWeek}
           className="h-9 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
         >
           {WEEKDAYS.map((d) => (
             <option key={d} value={d}>
-              {weekdayName(d).slice(0, 3)}
+              {t.weekdaysShort[d]}
             </option>
           ))}
         </select>
@@ -342,19 +346,23 @@ function EditableDay({
             className="gap-1"
           >
             <Plus className="size-3.5" />
-            Add exercise
+            {t.program.addExercise}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              if (confirm(`Remove "${day.name}" and all its exercises?`))
+              if (
+                confirm(
+                  `${t.program.confirmRemoveDay} "${day.name}" ${t.program.confirmRemoveDaySuffix}`,
+                )
+              )
                 run(() => removeDayAction({ id: day.id }));
             }}
             className="gap-1 text-destructive hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
-            Remove day
+            {t.program.removeDay}
           </Button>
         </div>
       )}
@@ -371,6 +379,7 @@ function PrescriptionRow({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const t = useT();
   const [sets, setSets] = useState(rx.targetSets);
   const [lo, setLo] = useState(rx.repMin);
   const [hi, setHi] = useState(rx.repMax);
@@ -396,7 +405,7 @@ function PrescriptionRow({
       <div className="flex flex-col">
         <button
           type="button"
-          aria-label="Move up"
+          aria-label={t.program.moveUp}
           disabled={isFirst}
           onClick={() => move("up")}
           className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
@@ -405,7 +414,7 @@ function PrescriptionRow({
         </button>
         <button
           type="button"
-          aria-label="Move down"
+          aria-label={t.program.moveDown}
           disabled={isLast}
           onClick={() => move("down")}
           className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
@@ -417,16 +426,16 @@ function PrescriptionRow({
       <span className="min-w-0 flex-1 truncate text-sm">{rx.name}</span>
 
       <div className="flex items-center gap-1 tabular-nums">
-        <NumberCell value={sets} onChange={setSets} onCommit={commit} label="sets" />
+        <NumberCell value={sets} onChange={setSets} onCommit={commit} label={t.program.setsLabel} />
         <span className="text-muted-foreground">×</span>
-        <NumberCell value={lo} onChange={setLo} onCommit={commit} label="min reps" />
+        <NumberCell value={lo} onChange={setLo} onCommit={commit} label={t.program.minRepsLabel} />
         <span className="text-muted-foreground">–</span>
-        <NumberCell value={hi} onChange={setHi} onCommit={commit} label="max reps" />
+        <NumberCell value={hi} onChange={setHi} onCommit={commit} label={t.program.maxRepsLabel} />
       </div>
 
       <button
         type="button"
-        aria-label={`Remove ${rx.name}`}
+        aria-label={`${t.program.remove} ${rx.name}`}
         onClick={() =>
           startTransition(() => void removePrescriptionAction({ id: rx.prescriptionId }))
         }
@@ -466,19 +475,20 @@ function NumberCell({
 // --- Add day ---------------------------------------------------------------
 
 function AddDay({ programId, nextWeekday }: { programId: string; nextWeekday: number }) {
+  const t = useT();
   const [, startTransition] = useTransition();
   return (
     <Button
       variant="outline"
       onClick={() =>
         startTransition(() =>
-          void addProgramDayAction({ programId, name: "New day", dayOfWeek: nextWeekday })
+          void addProgramDayAction({ programId, name: t.program.newDay, dayOfWeek: nextWeekday })
         )
       }
       className="h-11 w-full gap-1.5"
     >
       <Plus className="size-4" />
-      Add training day
+      {t.program.addTrainingDay}
     </Button>
   );
 }

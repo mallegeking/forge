@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import { logBodyweightAction, deleteBodyweightAction } from "@/app/actions";
 import { formatWeight, formatRelativeDay } from "@/lib/format";
+import { useT, useLocale } from "@/components/i18n/i18n-provider";
 import type { BodyweightLog } from "@/db/schema";
 
 function todayStr(): string {
@@ -16,6 +17,8 @@ function todayStr(): string {
 }
 
 export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
+  const t = useT();
+  const locale = useLocale();
   const latest = entries.at(-1);
   const [weight, setWeight] = useState("");
   const [date, setDate] = useState(todayStr());
@@ -47,7 +50,9 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
           className="flex items-end gap-2"
         >
           <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Weight (kg)</span>
+            <span className="text-xs text-muted-foreground">
+              {t.bodyweight.weightKg}
+            </span>
             <Input
               type="number"
               inputMode="decimal"
@@ -55,12 +60,16 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
               min="0"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              placeholder={latest ? formatWeight(latest.weightKg) : "e.g. 80"}
+              placeholder={
+                latest ? formatWeight(latest.weightKg) : t.bodyweight.weightPlaceholder
+              }
               className="h-11"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Date</span>
+            <span className="text-xs text-muted-foreground">
+              {t.bodyweight.date}
+            </span>
             <Input
               type="date"
               value={date}
@@ -75,7 +84,7 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
             className="h-11 gap-1"
           >
             <Plus className="size-4" />
-            Log
+            {t.bodyweight.log}
           </Button>
         </form>
       </Card>
@@ -83,7 +92,7 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
       {recent.length > 0 && (
         <div>
           <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Recent
+            {t.bodyweight.recent}
           </h2>
           <ul className="flex flex-col gap-2">
             {recent.map((e) => (
@@ -92,7 +101,7 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
                 className="flex items-center justify-between rounded-xl bg-card p-3 text-sm ring-1 ring-foreground/10"
               >
                 <span className="text-muted-foreground">
-                  {formatRelativeDay(e.measuredAt)}
+                  {formatRelativeDay(e.measuredAt, t.common, locale)}
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="font-medium tabular-nums">
@@ -100,7 +109,7 @@ export function BodyweightTracker({ entries }: { entries: BodyweightLog[] }) {
                   </span>
                   <button
                     type="button"
-                    aria-label="Delete entry"
+                    aria-label={t.bodyweight.deleteEntry}
                     onClick={() =>
                       startTransition(() => void deleteBodyweightAction({ id: e.id }))
                     }

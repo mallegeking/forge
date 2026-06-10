@@ -6,11 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sparkles, KeyRound, Settings, RefreshCw, Scale } from "lucide-react";
+import { useT } from "@/components/i18n/i18n-provider";
 
 // Streams an AI grocery list + meal ideas from /api/nutrition/groceries,
 // mirroring the coach chat's fetch + getReader() pattern and its graceful
 // degradation: 503 → connect a provider, 400 → log a weigh-in first.
 export function NutritionRecommendations() {
+  const t = useT();
   const [output, setOutput] = useState("");
   const [constraint, setConstraint] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -36,7 +38,7 @@ export function NutritionRecommendations() {
         return;
       }
       if (!res.ok || !res.body) {
-        setOutput("⚠️ Something went wrong. Please try again.");
+        setOutput(t.common.retry);
         return;
       }
 
@@ -48,7 +50,7 @@ export function NutritionRecommendations() {
         setOutput((prev) => prev + decoder.decode(value, { stream: true }));
       }
     } catch {
-      setOutput("⚠️ Connection lost. Please try again.");
+      setOutput(t.common.connectionLost);
     } finally {
       setStreaming(false);
     }
@@ -61,9 +63,9 @@ export function NutritionRecommendations() {
           <KeyRound className="size-5" />
         </div>
         <div>
-          <h2 className="font-medium">Recommendations are off</h2>
+          <h2 className="font-medium">{t.nutrition.recsOffTitle}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Connect an AI provider to generate grocery lists & meal ideas.
+            {t.nutrition.recsOffBody}
           </p>
         </div>
         <Link
@@ -71,7 +73,7 @@ export function NutritionRecommendations() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
         >
           <Settings className="size-4" />
-          Open settings
+          {t.coach.openSettings}
         </Link>
       </Card>
     );
@@ -84,9 +86,9 @@ export function NutritionRecommendations() {
           <Scale className="size-5" />
         </div>
         <div>
-          <h2 className="font-medium">Log a weigh-in first</h2>
+          <h2 className="font-medium">{t.nutrition.needsWeightTitle}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your targets are computed from bodyweight — log one to get started.
+            {t.nutrition.needsWeightBody}
           </p>
         </div>
         <Link
@@ -94,7 +96,7 @@ export function NutritionRecommendations() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
         >
           <Scale className="size-4" />
-          Log bodyweight
+          {t.nutrition.logBodyweight}
         </Link>
       </Card>
     );
@@ -108,7 +110,9 @@ export function NutritionRecommendations() {
         <Card className="p-4 text-sm whitespace-pre-wrap break-words">
           {output ||
             (streaming ? (
-              <span className="text-muted-foreground">Planning…</span>
+              <span className="text-muted-foreground">
+                {t.nutrition.planning}
+              </span>
             ) : null)}
         </Card>
       )}
@@ -116,22 +120,22 @@ export function NutritionRecommendations() {
       <Input
         value={constraint}
         onChange={(e) => setConstraint(e.target.value)}
-        placeholder="Any constraint this week? (e.g. vegetarian, on a budget)"
+        placeholder={t.nutrition.constraintPlaceholder}
         className="h-11"
       />
 
       <Button onClick={generate} disabled={streaming} className="h-11 w-full gap-1.5">
         {streaming ? (
-          <span className="text-muted-foreground">Generating…</span>
+          <span className="text-muted-foreground">{t.nutrition.generating}</span>
         ) : hasOutput ? (
           <>
             <RefreshCw className="size-4" />
-            Regenerate grocery list
+            {t.nutrition.regenerate}
           </>
         ) : (
           <>
             <Sparkles className="size-4" />
-            Generate grocery list
+            {t.nutrition.generate}
           </>
         )}
       </Button>

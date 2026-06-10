@@ -6,6 +6,7 @@ import { detectPlateau } from "@/lib/progression";
 import { LineChart } from "@/components/charts/line-chart";
 import { Card } from "@/components/ui/card";
 import { formatSet, formatWeight, formatRelativeDay } from "@/lib/format";
+import { getDict, getLocale } from "@/lib/i18n/server";
 
 export default async function ExercisePage({
   params,
@@ -13,12 +14,13 @@ export default async function ExercisePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const [t, locale] = await Promise.all([getDict(), getLocale()]);
   const history = await getExerciseHistory(id);
   if (!history) notFound();
 
   const { exercise, targetRange, points } = history;
   const chartData = points.map((p) => ({
-    label: p.performedAt.toLocaleDateString(undefined, {
+    label: p.performedAt.toLocaleDateString(locale, {
       day: "numeric",
       month: "short",
     }),
@@ -32,16 +34,16 @@ export default async function ExercisePage({
       .map((p) => ({ weightKg: p.topWeightKg, hitTopOfRange: p.hitTopOfRange }))
   );
   const stuckWeight = plateau.weightKg ?? 0;
-  const askCoach = `I've plateaued on ${exercise.name} — stuck at ${formatWeight(
+  const askCoach = `${t.exercise.askCoachPrompt1} ${exercise.name} ${t.exercise.askCoachPrompt2} ${formatWeight(
     stuckWeight
-  )}kg for ${plateau.consecutive} sessions. How do I break through?`;
+  )}${t.exercise.askCoachPrompt3} ${plateau.consecutive} ${t.exercise.askCoachPrompt4}`;
 
   return (
     <div>
       <header className="mb-4 flex items-center gap-2">
         <Link
           href="/"
-          aria-label="Back"
+          aria-label={t.common.back}
           className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ChevronLeft className="size-5" />
@@ -50,8 +52,8 @@ export default async function ExercisePage({
           <h1 className="truncate text-xl font-semibold tracking-tight">
             {exercise.name}
           </h1>
-          <p className="text-xs text-muted-foreground capitalize">
-            {exercise.type}
+          <p className="text-xs text-muted-foreground">
+            {t.exerciseTypes[exercise.type]}
             {targetRange &&
               ` · ${targetRange.targetSets} × ${targetRange.repMin}–${targetRange.repMax}`}
           </p>
@@ -73,25 +75,27 @@ export default async function ExercisePage({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-semibold">
-                Plateau — {plateau.consecutive} sessions stuck
+                {t.exercise.plateauTitle1} {plateau.consecutive}{" "}
+                {t.exercise.plateauTitle2}
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Held {formatWeight(stuckWeight)}kg for {plateau.consecutive}{" "}
-                sessions without topping the rep range. Time to change something:
+                {t.exercise.plateauBody1} {formatWeight(stuckWeight)}kg ·{" "}
+                {plateau.consecutive} {t.exercise.plateauSessions}{" "}
+                {t.exercise.plateauBody2}
               </p>
             </div>
           </div>
           <ul className="ml-0.5 flex flex-col gap-1 text-xs text-muted-foreground">
-            <li>• Drop ~10% and rebuild reps with strict form, then climb back.</li>
-            <li>• Add a back-off set, or bank an extra rep before adding load.</li>
-            <li>• Swap a close variation for 2–3 weeks, then return.</li>
+            {t.exercise.strategies.map((s, i) => (
+              <li key={i}>• {s}</li>
+            ))}
           </ul>
           <Link
             href={`/coach?ask=${encodeURIComponent(askCoach)}`}
             className="inline-flex items-center gap-1.5 self-start rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/80"
           >
             <Sparkles className="size-3.5" />
-            Ask your coach
+            {t.exercise.askCoach}
           </Link>
         </Card>
       )}
@@ -99,18 +103,18 @@ export default async function ExercisePage({
       <Card className="mb-4 py-4">
         <div className="px-4">
           <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Top set over time
+            {t.exercise.topSet}
           </p>
           <LineChart data={chartData} />
         </div>
       </Card>
 
       <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        History
+        {t.exercise.history}
       </h2>
       {points.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          No sessions logged yet.
+          {t.exercise.noSessions}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -120,7 +124,7 @@ export default async function ExercisePage({
               className="flex items-center justify-between rounded-xl bg-card p-3 text-sm ring-1 ring-foreground/10"
             >
               <span className="text-muted-foreground">
-                {formatRelativeDay(p.performedAt)}
+                {formatRelativeDay(p.performedAt, t.common, locale)}
               </span>
               <span className="tabular-nums">
                 <span className="font-medium">
@@ -128,7 +132,8 @@ export default async function ExercisePage({
                 </span>
                 <span className="text-muted-foreground">
                   {" "}
-                  · {p.totalSets} {p.totalSets === 1 ? "set" : "sets"}
+                  · {p.totalSets}{" "}
+                  {p.totalSets === 1 ? t.exercise.setSingular : t.exercise.setPlural}
                 </span>
               </span>
             </li>

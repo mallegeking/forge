@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, SkipForward, Timer } from "lucide-react";
+import { useT } from "@/components/i18n/i18n-provider";
 
 type RestTimerContextValue = {
   /** Start (or restart) the rest countdown for `seconds`. */
@@ -32,6 +33,7 @@ function format(remaining: number): string {
 }
 
 export function RestTimerProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   // The timer is driven off an absolute end timestamp, so it stays correct even
   // if the tab is backgrounded and its timers are throttled.
   const [endsAt, setEndsAt] = useState<number | null>(null);
@@ -128,11 +130,15 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0 flex-1">
               {flash ? (
-                <p className="text-sm font-medium text-success">Rest complete 💪</p>
+                <p className="text-sm font-medium text-success">
+                  {t.session.restComplete}
+                </p>
               ) : (
                 <>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-muted-foreground">Rest</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t.session.rest}
+                    </span>
                     <span className="font-mono text-lg font-semibold tabular-nums">
                       {format(remaining)}
                     </span>
@@ -164,7 +170,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
                   className="h-10 gap-1 px-3"
                 >
                   <SkipForward className="size-4" />
-                  Skip
+                  {t.session.skip}
                 </Button>
               </div>
             )}

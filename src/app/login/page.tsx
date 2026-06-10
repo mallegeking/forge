@@ -2,13 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dumbbell } from "lucide-react";
 import { loginAction } from "@/app/actions";
+import { getDict } from "@/lib/i18n/server";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const { error } = await searchParams;
+  const [{ error }, t] = await Promise.all([searchParams, getDict()]);
 
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
@@ -19,9 +20,7 @@ export default async function LoginPage({
           </div>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Forge</h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your passcode to continue
-            </p>
+            <p className="text-sm text-muted-foreground">{t.login.tagline}</p>
           </div>
         </div>
 
@@ -31,17 +30,17 @@ export default async function LoginPage({
             type="password"
             autoFocus
             autoComplete="current-password"
-            placeholder="Passcode"
+            placeholder={t.login.passcode}
             aria-invalid={error ? true : undefined}
             className="h-12 text-center text-base"
           />
           {error && (
             <p className="text-center text-sm text-destructive">
-              Wrong passcode — try again.
+              {t.login.wrong}
             </p>
           )}
           <Button type="submit" className="h-12 w-full text-base">
-            Unlock
+            {t.login.unlock}
           </Button>
         </form>
       </div>
