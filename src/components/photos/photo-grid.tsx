@@ -25,7 +25,7 @@ export function PhotoGrid({ photos }: { photos: ProgressPhoto[] }) {
       {photos.map((p) => (
         <figure
           key={p.id}
-          className="relative overflow-hidden rounded-xl ring-1 ring-foreground/10"
+          className="relative overflow-hidden rounded-[14px] bg-card"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

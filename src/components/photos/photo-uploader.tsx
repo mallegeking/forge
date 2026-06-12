@@ -2,9 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Camera, Loader2 } from "lucide-react";
 import { useT } from "@/components/i18n/i18n-provider";
 
@@ -57,43 +54,55 @@ export function PhotoUploader() {
     }
   };
 
+  const inputClass =
+    "h-11 rounded-[12px] bg-foreground/[0.06] px-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring";
+
   return (
-    <Card className="gap-3 p-4">
+    <div className="flex flex-col gap-3 rounded-[16px] bg-card p-4">
       <input
         ref={fileRef}
         type="file"
         accept="image/*"
         capture="environment"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+        className="text-sm text-muted-foreground file:mr-3 file:rounded-[11px] file:border-0 file:bg-foreground/[0.07] file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-foreground"
       />
       <div className="flex items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{t.photos.date}</span>
-          <Input
+          <span className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+            {t.photos.date}
+          </span>
+          <input
             type="date"
             value={date}
             max={todayStr()}
             onChange={(e) => setDate(e.target.value)}
-            className="h-11"
+            className={inputClass}
           />
         </label>
-        <Input
+        <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={t.photos.notePlaceholder}
-          className="h-11 flex-1"
+          className={`${inputClass} min-w-0 flex-1`}
         />
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <Button onClick={upload} disabled={!file || uploading} className="h-11 gap-1.5">
+      <button
+        type="button"
+        onClick={upload}
+        disabled={!file || uploading}
+        className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[12px] bg-primary text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+      >
         {uploading ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <Camera className="size-4" />
         )}
-        {uploading ? t.photos.uploading : t.photos.addPhoto}
-      </Button>
-    </Card>
+        <span className="font-display text-[17px] font-semibold tracking-[0.14em] uppercase">
+          {uploading ? t.photos.uploading : t.photos.addPhoto}
+        </span>
+      </button>
+    </div>
   );
 }

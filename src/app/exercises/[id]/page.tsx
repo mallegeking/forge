@@ -5,7 +5,6 @@ import { BackButton } from "@/components/nav/back-button";
 import { getExerciseHistory } from "@/lib/queries";
 import { detectPlateau } from "@/lib/progression";
 import { LineChart } from "@/components/charts/line-chart";
-import { Card } from "@/components/ui/card";
 import { formatSet, formatWeight, formatRelativeDay } from "@/lib/format";
 import { getDict, getLocale } from "@/lib/i18n/server";
 
@@ -40,17 +39,17 @@ export default async function ExercisePage({
   )}${t.exercise.askCoachPrompt3} ${plateau.consecutive} ${t.exercise.askCoachPrompt4}`;
 
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
+      <header className="-mx-[22px] flex items-center gap-2.5 px-[22px] pt-2 pb-[18px]">
         <BackButton
           label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="-m-1.5 shrink-0 p-1.5 text-muted-foreground"
         />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
+        <div className="flex min-w-0 flex-col">
+          <h1 className="truncate font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
             {exercise.name}
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-1 truncate text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
             {t.exerciseTypes[exercise.type]}
             {targetRange &&
               ` · ${targetRange.targetSets} × ${targetRange.repMin}–${targetRange.repMax}`}
@@ -59,14 +58,14 @@ export default async function ExercisePage({
       </header>
 
       {exercise.injuryNote && (
-        <div className="mb-4 flex gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="mb-3.5 flex gap-2 rounded-[12px] bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
           <AlertTriangle className="size-4 shrink-0" />
           <span>{exercise.injuryNote}</span>
         </div>
       )}
 
       {plateau.isPlateau && (
-        <Card className="mb-4 gap-3 p-4">
+        <div className="mb-3.5 flex flex-col gap-3 rounded-[14px] bg-card px-4 py-3.5">
           <div className="flex items-start gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-500">
               <AlertTriangle className="size-4" />
@@ -90,24 +89,24 @@ export default async function ExercisePage({
           </ul>
           <Link
             href={`/coach?ask=${encodeURIComponent(askCoach)}`}
-            className="inline-flex items-center gap-1.5 self-start rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/80"
+            className="inline-flex items-center gap-1.5 self-start rounded-[11px] bg-primary px-3.5 py-2 text-primary-foreground"
           >
             <Sparkles className="size-3.5" />
-            {t.exercise.askCoach}
+            <span className="font-display text-[13px] font-semibold tracking-[0.12em] uppercase">
+              {t.exercise.askCoach}
+            </span>
           </Link>
-        </Card>
+        </div>
       )}
 
-      <Card className="mb-4 py-4">
-        <div className="px-4">
-          <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {t.exercise.topSet}
-          </p>
-          <LineChart data={chartData} />
-        </div>
-      </Card>
+      <div className="mb-[18px] rounded-[16px] bg-card p-4">
+        <p className="mb-2.5 text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+          {t.exercise.topSet}
+        </p>
+        <LineChart data={chartData} />
+      </div>
 
-      <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <h2 className="mb-2 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
         {t.exercise.history}
       </h2>
       {points.length === 0 ? (
@@ -116,19 +115,23 @@ export default async function ExercisePage({
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {[...points].reverse().map((p) => (
+          {[...points].reverse().map((p, i) => (
             <li
               key={p.sessionId}
-              className="flex items-center justify-between rounded-xl bg-card p-3 text-sm ring-1 ring-foreground/10"
+              className="flex items-center justify-between gap-2"
             >
-              <span className="text-muted-foreground">
+              <span className="text-[13px] text-foreground/75">
                 {formatRelativeDay(p.performedAt, t.common, locale)}
               </span>
-              <span className="tabular-nums">
-                <span className="font-medium">
+              <span>
+                <span
+                  className={`font-display text-[16px] font-semibold tracking-[0.06em] ${
+                    i === 0 ? "text-foreground" : "text-foreground/75"
+                  }`}
+                >
                   {formatSet(p.topWeightKg, p.topReps)}
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-[12px] text-muted-foreground">
                   {" "}
                   · {p.totalSets}{" "}
                   {p.totalSets === 1 ? t.exercise.setSingular : t.exercise.setPlural}

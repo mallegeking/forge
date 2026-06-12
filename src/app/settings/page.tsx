@@ -15,22 +15,22 @@ export default async function SettingsPage() {
   const [coach, t] = await Promise.all([getCoachSettings(), getDict()]);
 
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
+      <header className="-mx-[22px] flex items-center gap-2.5 px-[22px] pt-2 pb-[18px]">
         <Link
           href="/"
           aria-label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="-m-1.5 shrink-0 p-1.5 text-muted-foreground"
         >
-          <ChevronLeft className="size-5" />
+          <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
         </Link>
-        <h1 className="text-xl font-semibold tracking-tight">
+        <span className="font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
           {t.settings.title}
-        </h1>
+        </span>
       </header>
 
       <section className="mb-6">
-        <h2 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <h2 className="mb-2.5 flex items-center gap-1.5 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
           <Languages className="size-3.5" />
           {t.settings.language}
         </h2>
@@ -38,7 +38,7 @@ export default async function SettingsPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 flex items-center gap-1.5 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <h2 className="mb-2.5 flex items-center gap-1.5 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
           <Sparkles className="size-3.5" />
           {t.settings.aiCoach}
         </h2>

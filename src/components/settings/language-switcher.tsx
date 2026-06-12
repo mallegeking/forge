@@ -21,9 +21,10 @@ export function LanguageSwitcher() {
     });
   }
 
+  // Segmented control in the Ember idiom (mirrors the Fuel goal switcher).
   return (
     <div>
-      <p className="mb-2 px-1 text-xs text-muted-foreground">
+      <p className="mb-2.5 text-xs text-muted-foreground">
         {t.settings.languageHint}
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -36,13 +37,13 @@ export function LanguageSwitcher() {
               onClick={() => choose(locale)}
               disabled={pending}
               aria-pressed={isActive}
-              className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-medium ring-1 transition-colors disabled:opacity-60 ${
+              className={`flex h-11 items-center justify-center gap-1.5 rounded-[11px] font-display text-[15px] font-semibold tracking-[0.12em] uppercase transition-colors disabled:opacity-60 ${
                 isActive
-                  ? "bg-primary/15 text-primary ring-primary/40"
-                  : "bg-card text-foreground ring-foreground/10 hover:bg-muted/40"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-input text-muted-foreground"
               }`}
             >
-              {isActive && <Check className="size-4" />}
+              {isActive && <Check className="size-4" strokeWidth={2.4} />}
               {LOCALE_LABELS[locale]}
             </button>
           );
