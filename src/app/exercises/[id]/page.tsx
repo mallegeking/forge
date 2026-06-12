@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, Sparkles } from "lucide-react";
+import { BackButton } from "@/components/nav/back-button";
 import { getExerciseHistory } from "@/lib/queries";
 import { detectPlateau } from "@/lib/progression";
 import { LineChart } from "@/components/charts/line-chart";
@@ -41,13 +42,10 @@ export default async function ExercisePage({
   return (
     <div>
       <header className="mb-4 flex items-center gap-2">
-        <Link
-          href="/"
-          aria-label={t.common.back}
+        <BackButton
+          label={t.common.back}
           className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
+        />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-semibold tracking-tight">
             {exercise.name}

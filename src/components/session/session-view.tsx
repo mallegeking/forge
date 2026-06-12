@@ -9,7 +9,16 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Minus, Plus, Check, SkipForward, Flame } from "lucide-react";
+import Link from "next/link";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  Plus,
+  Check,
+  SkipForward,
+  Flame,
+} from "lucide-react";
 import {
   deloadAdjust,
   isReadyToIncrease,
@@ -447,9 +456,20 @@ export function SessionView({
         <span className="font-semibold text-[11px] tracking-[0.22em] text-primary uppercase">
           {t.session.exercise} {exIndex + 1} {t.session.of} {exercises.length}
         </span>
-        <h1 className="mt-1.5 font-display text-[42px] font-bold leading-[0.95] tracking-[0.01em] uppercase">
-          {ex.name}
-        </h1>
+        {/* The title opens the exercise's history/plateau page — logged sets
+            are already persisted, so navigating away loses nothing. */}
+        <Link
+          href={`/exercises/${ex.exerciseId}`}
+          className="group mt-1.5 flex items-baseline gap-2"
+        >
+          <h1 className="min-w-0 font-display text-[42px] font-bold leading-[0.95] tracking-[0.01em] uppercase group-active:text-foreground/80">
+            {ex.name}
+          </h1>
+          <ChevronRight
+            className="size-5 shrink-0 self-center text-muted-foreground"
+            strokeWidth={2.4}
+          />
+        </Link>
         <p className="mt-2 text-[12px] tracking-[0.14em] text-muted-foreground uppercase">
           {effSets} {t.session.sets} · {ex.repMin}–{ex.repMax} {t.session.reps} ·{" "}
           {t.exerciseTypes[ex.type]}
