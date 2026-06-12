@@ -8,8 +8,9 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -28,6 +29,8 @@
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-card-active: var(--card-active);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -50,6 +53,12 @@
 }
 
 :root {
+  /* Archivo for body/UI, Barlow Condensed for display — wired from next/font
+     in layout.tsx. The variables fall back to the system stack pre-hydration. */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-display: var(--font-barlow-condensed), ui-sans-serif, system-ui,
+    sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -85,39 +94,111 @@
 }
 
 .dark {
-  /* Deep, cool-toned dark — not pure black. Electric-blue accent for CTAs. */
-  --background: oklch(0.16 0.012 266);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0.014 266);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0.014 266);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.188 256);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0.01 266);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0.01 266);
-  --muted-foreground: oklch(0.708 0.02 266);
-  --accent: oklch(0.279 0.02 266);
-  --accent-foreground: oklch(0.985 0 0);
+  /* "Ember" — warm near-black with a single ember-orange accent. See the
+     design handoff design-tokens table; shadcn's semantic slots are mapped
+     onto the Ember palette so every component inherits the theme. */
+  --background: #15110d; /* bg/app */
+  --foreground: #f4efe8; /* text/primary */
+  --card: #221c15; /* bg/card */
+  --card-foreground: #f4efe8;
+  --card-active: #2a1a0e; /* bg/card-active — "today" fills */
+  --popover: #1c1610; /* bg/sheet */
+  --popover-foreground: #f4efe8;
+  --primary: #ff5a1f; /* accent */
+  --primary-foreground: #1a0e06; /* on-accent */
+  --secondary: #221c15;
+  --secondary-foreground: #f4efe8;
+  --muted: #221c15;
+  --muted-foreground: #877e72; /* text/muted */
+  --accent: #2a1a0e;
+  --accent-foreground: #f4efe8;
   --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.7 0.16 162);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.55 0.13 256);
-  --chart-1: oklch(0.62 0.188 256);
-  --chart-2: oklch(0.696 0.17 162);
+  --success: #7ed09a;
+  --success-foreground: #0e1a12; /* on-success */
+  --border: rgba(244, 239, 232, 0.08); /* border/subtle */
+  --input: rgba(244, 239, 232, 0.16); /* border/control */
+  --ring: #ff5a1f;
+  --chart-1: #ff5a1f;
+  --chart-2: #7ed09a;
   --chart-3: oklch(0.769 0.188 70);
   --chart-4: oklch(0.627 0.265 304);
   --chart-5: oklch(0.645 0.246 16);
-  --sidebar: oklch(0.205 0.014 266);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.62 0.188 256);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0.01 266);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.13 256);
+  --sidebar: #221c15;
+  --sidebar-foreground: #f4efe8;
+  --sidebar-primary: #ff5a1f;
+  --sidebar-primary-foreground: #1a0e06;
+  --sidebar-accent: #2a1a0e;
+  --sidebar-accent-foreground: #f4efe8;
+  --sidebar-border: rgba(244, 239, 232, 0.08);
+  --sidebar-ring: #ff5a1f;
+}
+
+/* "Ember" signature motion — strong ease-out entrances (see design handoff). */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(44px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes flamePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes goPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(126, 208, 154, 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 12px rgba(126, 208, 154, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(126, 208, 154, 0);
+  }
 }
 
 @layer base {

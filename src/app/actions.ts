@@ -96,6 +96,15 @@ export async function finishSessionAction(formData: FormData) {
   redirect("/");
 }
 
+/**
+ * Mark a session complete WITHOUT redirecting — the Ember session flow shows
+ * its "Forged" receipt client-side first, then navigates home from the receipt.
+ */
+export async function completeSessionAction(input: { sessionId: string }) {
+  await completeSession(input.sessionId);
+  revalidatePath("/");
+}
+
 export async function postponeDeloadAction() {
   await postponeDeload();
   revalidatePath("/");

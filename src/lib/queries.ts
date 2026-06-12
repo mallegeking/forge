@@ -11,7 +11,7 @@ import {
   progressPhotos,
   type ExerciseType,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
 import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
 import { getSetting } from "@/lib/mutations";
 import type {
@@ -437,6 +437,135 @@ export async function getProgressPhotos() {
     .select()
     .from(progressPhotos)
     .orderBy(desc(progressPhotos.takenAt));
+}
+
+// --- Home "ledger" + week rail (Ember redesign) ---------------------------
+
+export type HomeLedger = {
+  dayName: string;
+  /** ISO weekday of the session (1 = Monday … 7 = Sunday). */
+  weekday: number;
+  performedAt: Date;
+  /** Total weight moved, in kg (Σ weight × reps). */
+  volumeKg: number;
+  /** Wall-clock minutes from start to completion, or null if not finished. */
+  durationMin: number | null;
+  /** Exercises whose best set beat their previous best — a PR. */
+  prCount: number;
+};
+
+/**
+ * The most recently completed session, condensed to the ledger card's three
+ * headline stats. PRs are detected per exercise: a session's best set weight
+ * beating that exercise's best in any earlier session (mirrors the receipt).
+ * Returns null when no session has been completed yet.
+ */
+export async function getHomeLedger(programId: string): Promise<HomeLedger | null> {
+  const [session] = await db
+    .select({
+      id: workoutSessions.id,
+      performedAt: workoutSessions.performedAt,
+      completedAt: workoutSessions.completedAt,
+      dayName: programDays.name,
+      weekday: programDays.dayOfWeek,
+    })
+    .from(workoutSessions)
+    .innerJoin(programDays, eq(workoutSessions.dayId, programDays.id))
+    .where(
+      and(
+        eq(workoutSessions.programId, programId),
+        isNotNull(workoutSessions.completedAt)
+      )
+    )
+    .orderBy(desc(workoutSessions.performedAt))
+    .limit(1);
+
+  if (!session) return null;
+
+  const logs = await db
+    .select({ exerciseId: setLogs.exerciseId, weightKg: setLogs.weightKg, reps: setLogs.reps })
+    .from(setLogs)
+    .where(eq(setLogs.sessionId, session.id));
+
+  const volumeKg = logs.reduce((sum, l) => sum + l.weightKg * l.reps, 0);
+  const durationMin = session.completedAt
+    ? Math.max(
+        1,
+        Math.round(
+          (session.completedAt.getTime() - session.performedAt.getTime()) / 60000
+        )
+      )
+    : null;
+
+  // Best weight per exercise in this session.
+  const bestNow = new Map<string, number>();
+  for (const l of logs) {
+    bestNow.set(l.exerciseId, Math.max(bestNow.get(l.exerciseId) ?? 0, l.weightKg));
+  }
+
+  // Best weight per exercise across every earlier session in this program.
+  let prCount = 0;
+  if (bestNow.size > 0) {
+    const priorRows = await db
+      .select({ exerciseId: setLogs.exerciseId, weightKg: setLogs.weightKg })
+      .from(setLogs)
+      .innerJoin(workoutSessions, eq(setLogs.sessionId, workoutSessions.id))
+      .where(
+        and(
+          eq(workoutSessions.programId, programId),
+          lt(workoutSessions.performedAt, session.performedAt)
+        )
+      );
+
+    const bestPrior = new Map<string, number>();
+    for (const r of priorRows) {
+      bestPrior.set(
+        r.exerciseId,
+        Math.max(bestPrior.get(r.exerciseId) ?? 0, r.weightKg)
+      );
+    }
+
+    for (const [exerciseId, now] of bestNow) {
+      const prior = bestPrior.get(exerciseId);
+      if (prior != null && now > prior) prCount += 1;
+    }
+  }
+
+  return {
+    dayName: session.dayName,
+    weekday: session.weekday,
+    performedAt: session.performedAt,
+    volumeKg,
+    durationMin,
+    prCount,
+  };
+}
+
+/** Monday-00:00 (local) of the calendar week containing `d`. */
+function startOfWeek(d: Date): Date {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return date;
+}
+
+/**
+ * Program-day ids that already have a completed session in the current calendar
+ * week — drives the week rail's "DONE" marks and the home "FORGED TODAY" state.
+ */
+export async function getCompletedDayIdsThisWeek(
+  programId: string
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ dayId: workoutSessions.dayId })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.programId, programId),
+        isNotNull(workoutSessions.completedAt),
+        gte(workoutSessions.performedAt, startOfWeek(new Date()))
+      )
+    );
+  return new Set(rows.map((r) => r.dayId));
 }
 
 /** One photo's metadata — for serving its bytes with the right content type. */
