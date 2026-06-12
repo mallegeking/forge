@@ -6,22 +6,13 @@ Forge follows one progression rule end to end: **reps first, then weight.** Hit 
 
 ## Screenshots
 
-> Drop captures into `docs/screenshots/` (suggested filenames below), then uncomment the grid to publish them.
-
-<!-- Uncomment once the images exist:
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/home.png" alt="Home — today's session and the proactive coach's note" /></td>
-    <td width="50%"><img src="docs/screenshots/session.png" alt="Session — per-set logging with the rest timer" /></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/coach.png" alt="AI coach chat grounded in your training" /></td>
-    <td width="50%"><img src="docs/screenshots/nutrition.png" alt="Nutrition targets and AI grocery recommendations" /></td>
+    <td width="33%"><img src="docs/screenshots/home.png" alt="Home — today's session, the proactive coach's note, and the week rail" /></td>
+    <td width="33%"><img src="docs/screenshots/program.png" alt="Program — the split with expandable day prescriptions" /></td>
+    <td width="33%"><img src="docs/screenshots/nutrition.png" alt="Fuel — computed nutrition targets, goal switcher, and protein-dense groceries" /></td>
   </tr>
 </table>
--->
-
-_Screenshots coming soon._
 
 ## Features
 

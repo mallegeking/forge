@@ -38,6 +38,7 @@ yarn-error.log*
 *.db
 *.db-wal
 *.db-shm
+*.db.bak
 
 # user uploads (progress photos)
 /data
