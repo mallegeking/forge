@@ -423,6 +423,17 @@ export default async function Home() {
             );
           })}
         </div>
+
+        {/* Entry to the program editor — the rail shows the week, this opens
+            the full split (otherwise /program has no navigation path). */}
+        <div className="mt-3.5 px-[22px] text-center">
+          <Link
+            href="/program"
+            className="inline-block font-semibold text-[11px] tracking-[0.12em] text-primary uppercase"
+          >
+            {t.home.viewFullProgram}
+          </Link>
+        </div>
       </section>
     </div>
   );
