@@ -65,7 +65,8 @@ export function WeekDayCard({
             </span>
           ) : (
             <span className="text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-              {exerciseCount} {t.home.exercises}
+              {exerciseCount}{" "}
+              {exerciseCount === 1 ? t.home.exercise : t.home.exercises}
             </span>
           )}
         </span>

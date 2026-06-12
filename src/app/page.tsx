@@ -187,11 +187,14 @@ export default async function Home() {
           {todayDay ? shortDayName(todayDay.name) : t.home.restDayTitle}
         </h1>
         <p className="mt-2.5 text-[12px] tracking-[0.18em] text-muted-foreground uppercase">
-          {todayDay
-            ? readyCount > 0
-              ? `${counts.get(todayDay.id) ?? 0} ${t.home.exercises} · ${readyCount} ${t.home.liftsReady}`
-              : `${counts.get(todayDay.id) ?? 0} ${t.home.exercises}`
-            : t.home.restDayBody}
+          {(() => {
+            if (!todayDay) return t.home.restDayBody;
+            const n = counts.get(todayDay.id) ?? 0;
+            const base = `${n} ${n === 1 ? t.home.exercise : t.home.exercises}`;
+            return readyCount > 0
+              ? `${base} · ${readyCount} ${t.home.liftsReady}`
+              : base;
+          })()}
         </p>
 
         {deload && (

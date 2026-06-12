@@ -182,7 +182,8 @@ function CollapsibleDays({ days }: { days: DayBlock[] }) {
               <span className="flex shrink-0 items-center gap-2.5">
                 {!open && (
                   <span className="text-[11px] text-muted-foreground">
-                    {exercises.length} {t.home.exercises}
+                    {exercises.length}{" "}
+                    {exercises.length === 1 ? t.home.exercise : t.home.exercises}
                   </span>
                 )}
                 {open ? (

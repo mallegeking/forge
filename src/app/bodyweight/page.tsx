@@ -33,7 +33,10 @@ export default async function BodyweightPage() {
         </div>
         <div className="flex items-center gap-3.5">
           <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-            {weekly.length} {t.bodyweight.weeksTracked}
+            {weekly.length}{" "}
+            {weekly.length === 1
+              ? t.bodyweight.weekTracked
+              : t.bodyweight.weeksTracked}
           </span>
           <Link
             href="/photos"
@@ -69,7 +72,10 @@ export default async function BodyweightPage() {
                   {formatWeight(Math.abs(trend))} {t.session.kg.toUpperCase()}
                 </span>
                 <span className="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                  {t.bodyweight.over} {weekly.length} {t.bodyweight.weeksWord}
+                  {t.bodyweight.over} {weekly.length}{" "}
+                  {weekly.length === 1
+                    ? t.bodyweight.weekWord
+                    : t.bodyweight.weeksWord}
                 </span>
               </div>
             )}

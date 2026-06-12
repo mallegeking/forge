@@ -152,6 +152,12 @@ export function SessionView({
 
   // --- Clock + rest timer (driven off absolute timestamps) ------------------
   const [now, setNow] = useState(() => Date.now());
+  // A session resumed hours/days after it was started would show an absurd
+  // elapsed clock ("1002:50"). Past the same 4h cap the durations use, the
+  // clock (and the receipt's duration) counts from when this screen opened.
+  const [mountedAt] = useState(() => Date.now());
+  const clockBase =
+    mountedAt - startAt > 4 * 60 * 60 * 1000 ? mountedAt : startAt;
   const [restEnd, setRestEnd] = useState<number | null>(null);
   const [restTotal, setRestTotal] = useState(0);
   const [flashUntil, setFlashUntil] = useState(0);
@@ -326,7 +332,7 @@ export function SessionView({
     const order = { PR: 0, READY: 1, HELD: 2 } as const;
     highlights.sort((a, b) => order[a.kind] - order[b.kind]);
 
-    const rawMin = Math.max(1, Math.round((Date.now() - startAt) / 60000));
+    const rawMin = Math.max(1, Math.round((Date.now() - clockBase) / 60000));
 
     setReceipt({
       volumeT: (volKg / 1000).toFixed(1),
@@ -339,7 +345,7 @@ export function SessionView({
     startTransition(async () => {
       await completeSessionAction({ sessionId: view.session.id });
     });
-  }, [exercises, logged, rxOf, startAt, t, view.session.id, startTransition]);
+  }, [exercises, logged, rxOf, clockBase, t, view.session.id, startTransition]);
 
   const saveNote = useCallback(() => {
     const value = notes[ex.exerciseId] ?? "";
@@ -430,7 +436,7 @@ export function SessionView({
           </div>
         </div>
         <span className="font-display text-[17px] font-semibold tracking-[0.08em] text-muted-foreground tabular-nums">
-          {fmtClock((now - startAt) / 1000)}
+          {fmtClock((now - clockBase) / 1000)}
         </span>
       </header>
 
@@ -471,8 +477,8 @@ export function SessionView({
           />
         </Link>
         <p className="mt-2 text-[12px] tracking-[0.14em] text-muted-foreground uppercase">
-          {effSets} {t.session.sets} · {ex.repMin}–{ex.repMax} {t.session.reps} ·{" "}
-          {t.exerciseTypes[ex.type]}
+          {effSets} {effSets === 1 ? t.session.set : t.session.sets} ·{" "}
+          {ex.repMin}–{ex.repMax} {t.session.reps} · {t.exerciseTypes[ex.type]}
           {isDeload ? ` · ${t.session.deload}` : ""}
         </p>
         {ex.injuryNote && (
@@ -798,8 +804,8 @@ function ReceiptScreen({
         <ReceiptStat value={receipt.volumeT} unit=" t" label={t.receipt.volumeMoved} />
         <ReceiptStat
           value={String(receipt.totalSets)}
-          unit={` ${t.receipt.sets}`}
-          label={`${exerciseCount} ${t.receipt.exercises}`}
+          unit={` ${receipt.totalSets === 1 ? t.receipt.setOne : t.receipt.sets}`}
+          label={`${exerciseCount} ${exerciseCount === 1 ? t.receipt.exerciseOne : t.receipt.exercises}`}
         />
       </div>
 
