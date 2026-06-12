@@ -13,7 +13,7 @@ import {
 import { nanoid } from "nanoid";
 
 // Rest defaults by movement type (seconds). Compound lifts need longer rests.
-const REST: Record<ExerciseType, number> = { compound: 150, isolation: 75 };
+const REST: Record<ExerciseType, number> = { compound: 150, isolation: 90 };
 
 // --- Canonical exercise library -------------------------------------------
 // type drives rest + increment; injury notes are this user's known issues.

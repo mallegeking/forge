@@ -23,7 +23,7 @@ describe("rest + increment by type", () => {
     expect(suggestIncrement("compound")).toEqual({ min: 2.5, max: 5 });
   });
   it("isolation rests less and jumps less", () => {
-    expect(restSecondsFor("isolation")).toBe(75);
+    expect(restSecondsFor("isolation")).toBe(90);
     expect(suggestIncrement("isolation")).toEqual({ min: 1, max: 2.5 });
   });
 });

@@ -20,9 +20,13 @@ export type RepRange = {
   repMax: number;
 };
 
-/** Rest between sets. Compound lifts get 2–3 min, isolation 60–90s. */
+/**
+ * Default rest for NEW exercises, by type. The Ember spec's finer tiers
+ * (180s big compounds / 150s rows / 120s cable / 90s isolation) live as
+ * per-exercise data — these are the mid-tier starting points.
+ */
 export function restSecondsFor(type: ExerciseType): number {
-  return type === "compound" ? 150 : 75;
+  return type === "compound" ? 150 : 90;
 }
 
 /** Suggested weight jump once reps top out, in kg, by movement type. */
