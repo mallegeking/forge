@@ -88,6 +88,15 @@ export async function startOrResumeSession(dayId: string): Promise<string> {
   return id;
 }
 
+/**
+ * Restart the program clock: week counting (and with it the deload cadence)
+ * begins again today. Logged sessions, weights, and bodyweight are untouched.
+ */
+export async function resetTrainingProgress() {
+  await setSetting("trainingStartDate", new Date().toISOString());
+  await setSetting("deloadPostponedWeek", "");
+}
+
 /** Skip the deload for the current training week (recorded against that week). */
 export async function postponeDeload() {
   const startIso = await getSetting("trainingStartDate");

@@ -8,6 +8,7 @@ import {
   startOrResumeSession,
   completeSession,
   postponeDeload,
+  resetTrainingProgress,
   logSet,
   updateSet,
   deleteSet,
@@ -108,6 +109,12 @@ export async function completeSessionAction(input: { sessionId: string }) {
 export async function postponeDeloadAction() {
   await postponeDeload();
   revalidatePath("/");
+}
+
+export async function resetTrainingProgressAction() {
+  await resetTrainingProgress();
+  revalidatePath("/");
+  revalidatePath("/settings");
 }
 
 // Called from client components with structured args.

@@ -3,6 +3,7 @@ import {
   getActiveProgram,
   getProgramDays,
   getProgramDayCounts,
+  getDayExercises,
   getCoachingInput,
   getHomeLedger,
   getCompletedDayIdsThisWeek,
@@ -88,29 +89,39 @@ export default async function Home() {
     getNutritionConfig(),
   ]);
 
-  // Proactive, no-AI coach note: lifts that hit the top of their range and are
-  // ready for more load. Plateaus are surfaced too (problems first).
-  const note = snapshot ? buildCoachNote(snapshot) : null;
-  const noteItems = note
-    ? [
-        ...note.plateau.map((p) => ({
-          key: `p-${p.name}`,
-          name: p.name,
-          tag: `${p.sessions} ${t.coachNote.sessions}`,
-          good: false,
-        })),
-        ...note.ready.map((r) => ({
-          key: `r-${r.name}`,
-          name: r.name,
-          tag: `+${r.incMin} ${t.home.kgReady}`,
-          good: true,
-        })),
-      ].slice(0, 3)
-    : [];
-  const readyCount = note?.ready.length ?? 0;
-
   const today = isoWeekday();
   const todayDay = days.find((d) => d.dayOfWeek === today) ?? null;
+
+  // Proactive, no-AI coach note — scoped to TODAY's session: it only surfaces
+  // lifts you're about to train (no "bench is ready" on leg day), and shows
+  // nothing on rest days or when today holds nothing actionable.
+  const todayNames = new Set(
+    todayDay ? (await getDayExercises(todayDay.id)).map((e) => e.name) : []
+  );
+  const note = snapshot && todayDay ? buildCoachNote(snapshot) : null;
+  const noteItems = note
+    ? [
+        ...note.plateau
+          .filter((p) => todayNames.has(p.name))
+          .map((p) => ({
+            key: `p-${p.name}`,
+            name: p.name,
+            tag: `${p.sessions} ${t.coachNote.sessions}`,
+            good: false,
+          })),
+        ...note.ready
+          .filter((r) => todayNames.has(r.name))
+          .map((r) => ({
+            key: `r-${r.name}`,
+            name: r.name,
+            tag: `+${r.incMin} ${t.home.kgReady}`,
+            good: true,
+          })),
+      ].slice(0, 3)
+    : [];
+  const readyCount = note
+    ? note.ready.filter((r) => todayNames.has(r.name)).length
+    : 0;
   const week = startIso
     ? computeTrainingWeek(new Date(startIso), new Date())
     : null;

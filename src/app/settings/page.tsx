@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ChevronLeft, Sparkles, Languages } from "lucide-react";
+import { ChevronLeft, Sparkles, Languages, CalendarRange } from "lucide-react";
 import { getCoachSettings } from "@/lib/coach-config";
+import { getSetting } from "@/lib/mutations";
+import { computeTrainingWeek } from "@/lib/progression";
 import { getDict } from "@/lib/i18n/server";
 import { CoachSettingsForm } from "@/components/settings/coach-settings-form";
 import { LanguageSwitcher } from "@/components/settings/language-switcher";
+import { ResetTraining } from "@/components/settings/reset-training";
 
 export const metadata: Metadata = { title: "Settings · Forge" };
 
@@ -12,7 +15,14 @@ export const metadata: Metadata = { title: "Settings · Forge" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [coach, t] = await Promise.all([getCoachSettings(), getDict()]);
+  const [coach, t, startIso] = await Promise.all([
+    getCoachSettings(),
+    getDict(),
+    getSetting("trainingStartDate"),
+  ]);
+  const week = startIso
+    ? computeTrainingWeek(new Date(startIso), new Date())
+    : null;
 
   return (
     <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
@@ -36,6 +46,17 @@ export default async function SettingsPage() {
         </h2>
         <LanguageSwitcher />
       </section>
+
+      {/* Training clock — only meaningful once week counting has started. */}
+      {week != null && (
+        <section className="mb-6">
+          <h2 className="mb-2.5 flex items-center gap-1.5 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
+            <CalendarRange className="size-3.5" />
+            {t.settings.training} · {t.settings.currentWeek} {week}
+          </h2>
+          <ResetTraining />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2.5 flex items-center gap-1.5 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">

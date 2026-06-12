@@ -113,6 +113,13 @@ export const en = {
     aiCoach: "AI coach",
     language: "Language",
     languageHint: "Choose the app and AI coach language.",
+    training: "Training",
+    currentWeek: "Currently in week",
+    resetWeek: "Restart at week 1",
+    resetHint:
+      "Resets the week counter and deload cadence. Logged sessions and weights are kept.",
+    resetConfirm:
+      "Restart the program at week 1? Your logged sessions and weights are kept.",
   },
 
   coach: {

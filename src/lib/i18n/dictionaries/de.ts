@@ -111,6 +111,13 @@ export const de: Dictionary = {
     aiCoach: "KI-Coach",
     language: "Sprache",
     languageHint: "Wähle die Sprache für App und KI-Coach.",
+    training: "Training",
+    currentWeek: "Aktuell in Woche",
+    resetWeek: "Bei Woche 1 neu starten",
+    resetHint:
+      "Setzt den Wochenzähler und den Deload-Rhythmus zurück. Erfasste Einheiten und Gewichte bleiben erhalten.",
+    resetConfirm:
+      "Programm bei Woche 1 neu starten? Erfasste Einheiten und Gewichte bleiben erhalten.",
   },
 
   coach: {
