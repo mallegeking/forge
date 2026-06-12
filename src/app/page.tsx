@@ -383,32 +383,32 @@ export default async function Home() {
                   } ${isDone && !isToday ? "opacity-65" : ""}`}
                 >
                   <span
-                    className={`text-[10px] tracking-[0.18em] uppercase ${
+                    className={`shrink-0 text-[10px] tracking-[0.18em] uppercase ${
                       isToday ? "text-primary" : "text-muted-foreground"
                     }`}
                   >
                     {t.weekdaysShort[day.dayOfWeek]}
                   </span>
-                  <span className="mt-1 line-clamp-2 font-display text-[18px] font-semibold leading-none uppercase">
+                  <span className="mt-1 line-clamp-2 shrink-0 font-display text-[18px] font-semibold leading-none uppercase">
                     {shortDayName(day.name)}
                   </span>
-                  <span className="mt-auto">
+                  <span className="mt-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
                     {isDone ? (
-                      <span className="flex items-center gap-1">
+                      <>
                         <Check
-                          className="size-[11px] text-success"
+                          className="size-[11px] shrink-0 text-success"
                           strokeWidth={3}
                         />
-                        <span className="text-[9px] tracking-[0.14em] text-success uppercase">
+                        <span className="text-[9px] tracking-[0.1em] text-success uppercase">
                           {t.home.done}
                         </span>
-                      </span>
+                      </>
                     ) : isToday ? (
-                      <span className="text-[9px] tracking-[0.14em] text-primary uppercase">
+                      <span className="text-[9px] tracking-[0.1em] text-primary uppercase">
                         {t.home.todayTag}
                       </span>
                     ) : (
-                      <span className="text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
+                      <span className="text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
                         {counts.get(day.id) ?? 0} {t.home.exercises}
                       </span>
                     )}

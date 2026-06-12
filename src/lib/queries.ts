@@ -488,7 +488,9 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
     .where(eq(setLogs.sessionId, session.id));
 
   const volumeKg = logs.reduce((sum, l) => sum + l.weightKg * l.reps, 0);
-  const durationMin = session.completedAt
+  // Wall-clock duration; sessions resumed hours/days later would show absurd
+  // numbers, so anything past 4h reads as "no meaningful duration".
+  const rawMin = session.completedAt
     ? Math.max(
         1,
         Math.round(
@@ -496,6 +498,7 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
         )
       )
     : null;
+  const durationMin = rawMin != null && rawMin <= 240 ? rawMin : null;
 
   // Best weight per exercise in this session.
   const bestNow = new Map<string, number>();

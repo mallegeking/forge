@@ -47,7 +47,8 @@ type Highlight = {
 type Receipt = {
   volumeT: string;
   totalSets: number;
-  durationMin: number;
+  /** null when the wall-clock span is meaningless (resumed much later). */
+  durationMin: number | null;
   highlights: Highlight[];
 };
 
@@ -313,12 +314,12 @@ export function SessionView({
     const order = { PR: 0, READY: 1, HELD: 2 } as const;
     highlights.sort((a, b) => order[a.kind] - order[b.kind]);
 
-    const durationMin = Math.max(1, Math.round((Date.now() - startAt) / 60000));
+    const rawMin = Math.max(1, Math.round((Date.now() - startAt) / 60000));
 
     setReceipt({
       volumeT: (volKg / 1000).toFixed(1),
       totalSets,
-      durationMin,
+      durationMin: rawMin <= 240 ? rawMin : null,
       highlights: highlights.slice(0, 3),
     });
     setRestEnd(null);
@@ -752,8 +753,10 @@ function ReceiptScreen({
         </h1>
         <p className="mt-2.5 text-[12px] tracking-[0.16em] text-muted-foreground uppercase">
           {t.session.week} {weekNumber}
-          {weekday != null ? ` · ${t.weekdays[weekday]}` : ""} ·{" "}
-          {receipt.durationMin} {t.receipt.min}
+          {weekday != null ? ` · ${t.weekdays[weekday]}` : ""}
+          {receipt.durationMin != null
+            ? ` · ${receipt.durationMin} ${t.receipt.min}`
+            : ""}
         </p>
       </div>
 
