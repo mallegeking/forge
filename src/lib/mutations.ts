@@ -310,6 +310,7 @@ export async function createExercise(input: {
   name: string;
   type: ExerciseType;
   defaultRestSeconds: number;
+  isBodyweightPlus?: boolean;
   injuryNote?: string | null;
 }) {
   const id = nanoid();
@@ -318,6 +319,7 @@ export async function createExercise(input: {
     name: input.name.trim(),
     type: input.type,
     defaultRestSeconds: input.defaultRestSeconds,
+    isBodyweightPlus: input.isBodyweightPlus ?? false,
     injuryNote: input.injuryNote?.trim() || null,
   });
   return id;
@@ -329,6 +331,7 @@ export async function updateExercise(
     name?: string;
     type?: ExerciseType;
     defaultRestSeconds?: number;
+    isBodyweightPlus?: boolean;
     injuryNote?: string | null;
   }
 ) {
@@ -337,6 +340,8 @@ export async function updateExercise(
   if (values.type !== undefined) patch.type = values.type;
   if (values.defaultRestSeconds !== undefined)
     patch.defaultRestSeconds = values.defaultRestSeconds;
+  if (values.isBodyweightPlus !== undefined)
+    patch.isBodyweightPlus = values.isBodyweightPlus;
   if (values.injuryNote !== undefined)
     patch.injuryNote = values.injuryNote?.trim() || null;
   await db.update(exercises).set(patch).where(eq(exercises.id, id));

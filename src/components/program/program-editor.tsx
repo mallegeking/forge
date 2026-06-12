@@ -117,7 +117,15 @@ export function ProgramEditor({
             <AddDay programId={program.id} nextWeekday={nextFreeWeekday(days)} />
           </div>
         ) : (
-          <CollapsibleDays days={days} />
+          <div className="flex flex-col gap-4">
+            <CollapsibleDays days={days} />
+            {/* Adding from view mode flips into edit so the day can be named. */}
+            <AddDay
+              programId={program.id}
+              nextWeekday={nextFreeWeekday(days)}
+              onAdded={() => setEditing(true)}
+            />
+          </div>
         )}
       </div>
     </div>
@@ -564,17 +572,26 @@ function NumberCell({
 
 // --- Add day ---------------------------------------------------------------
 
-function AddDay({ programId, nextWeekday }: { programId: string; nextWeekday: number }) {
+function AddDay({
+  programId,
+  nextWeekday,
+  onAdded,
+}: {
+  programId: string;
+  nextWeekday: number;
+  onAdded?: () => void;
+}) {
   const t = useT();
   const [, startTransition] = useTransition();
   return (
     <button
       type="button"
-      onClick={() =>
+      onClick={() => {
         startTransition(() =>
           void addProgramDayAction({ programId, name: t.program.newDay, dayOfWeek: nextWeekday })
-        )
-      }
+        );
+        onAdded?.();
+      }}
       className="flex h-12 w-full items-center justify-center gap-2 rounded-[13px] border-[1.5px] border-dashed border-foreground/20 text-muted-foreground"
     >
       <Plus className="size-3.5" strokeWidth={2.4} />

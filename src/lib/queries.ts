@@ -73,6 +73,8 @@ export type DayExercise = {
   type: ExerciseType;
   injuryNote: string | null;
   defaultRestSeconds: number;
+  /** Weighted-bodyweight lift — logged weights are ADDED load ("+7.5 kg"). */
+  isBodyweightPlus: boolean;
   orderIndex: number;
   targetSets: number;
   repMin: number;
@@ -88,6 +90,7 @@ export async function getDayExercises(dayId: string): Promise<DayExercise[]> {
       type: exercises.type,
       injuryNote: exercises.injuryNote,
       defaultRestSeconds: exercises.defaultRestSeconds,
+      isBodyweightPlus: exercises.isBodyweightPlus,
       orderIndex: programDayExercises.orderIndex,
       targetSets: programDayExercises.targetSets,
       repMin: programDayExercises.repMin,
@@ -343,6 +346,7 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
       name: exercises.name,
       type: exercises.type,
       injuryNote: exercises.injuryNote,
+      isBodyweightPlus: exercises.isBodyweightPlus,
       targetSets: programDayExercises.targetSets,
       repMin: programDayExercises.repMin,
       repMax: programDayExercises.repMax,
@@ -397,6 +401,7 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
       name: p.name,
       type: p.type,
       injuryNote: p.injuryNote,
+      isBodyweightPlus: p.isBodyweightPlus,
       rx: { targetSets: p.targetSets, repMin: p.repMin, repMax: p.repMax },
       sessions: sessionsByExercise.get(exerciseId) ?? [],
     })
@@ -452,6 +457,13 @@ export type HomeLedger = {
   durationMin: number | null;
   /** Exercises whose best set beat their previous best — a PR. */
   prCount: number;
+  /** The heaviest PR's headline (e.g. "RDL · 100 kg ×8"), null when no PR. */
+  prDetail: {
+    name: string;
+    weightKg: number;
+    reps: number;
+    isBodyweightPlus: boolean;
+  } | null;
 };
 
 /**
@@ -500,14 +512,21 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
     : null;
   const durationMin = rawMin != null && rawMin <= 240 ? rawMin : null;
 
-  // Best weight per exercise in this session.
-  const bestNow = new Map<string, number>();
+  // Best set per exercise in this session (heaviest weight, most reps at it).
+  const bestNow = new Map<string, { weightKg: number; reps: number }>();
   for (const l of logs) {
-    bestNow.set(l.exerciseId, Math.max(bestNow.get(l.exerciseId) ?? 0, l.weightKg));
+    const cur = bestNow.get(l.exerciseId);
+    if (
+      !cur ||
+      l.weightKg > cur.weightKg ||
+      (l.weightKg === cur.weightKg && l.reps > cur.reps)
+    ) {
+      bestNow.set(l.exerciseId, { weightKg: l.weightKg, reps: l.reps });
+    }
   }
 
   // Best weight per exercise across every earlier session in this program.
-  let prCount = 0;
+  const prs: { exerciseId: string; weightKg: number; reps: number }[] = [];
   if (bestNow.size > 0) {
     const priorRows = await db
       .select({ exerciseId: setLogs.exerciseId, weightKg: setLogs.weightKg })
@@ -530,7 +549,30 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
 
     for (const [exerciseId, now] of bestNow) {
       const prior = bestPrior.get(exerciseId);
-      if (prior != null && now > prior) prCount += 1;
+      if (prior != null && now.weightKg > prior) {
+        prs.push({ exerciseId, weightKg: now.weightKg, reps: now.reps });
+      }
+    }
+  }
+
+  // Headline: the heaviest PR, named — "RDL 100 kg ×8" in the ledger caption.
+  let prDetail: HomeLedger["prDetail"] = null;
+  if (prs.length > 0) {
+    const top = prs.reduce((a, b) => (b.weightKg > a.weightKg ? b : a));
+    const [exRow] = await db
+      .select({
+        name: exercises.name,
+        isBodyweightPlus: exercises.isBodyweightPlus,
+      })
+      .from(exercises)
+      .where(eq(exercises.id, top.exerciseId));
+    if (exRow) {
+      prDetail = {
+        name: exRow.name,
+        weightKg: top.weightKg,
+        reps: top.reps,
+        isBodyweightPlus: exRow.isBodyweightPlus,
+      };
     }
   }
 
@@ -540,7 +582,8 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
     performedAt: session.performedAt,
     volumeKg,
     durationMin,
-    prCount,
+    prCount: prs.length,
+    prDetail,
   };
 }
 

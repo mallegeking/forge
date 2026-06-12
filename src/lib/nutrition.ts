@@ -131,7 +131,8 @@ How to do it:
 - Ground everything in the targets and data provided. Never invent the athlete's weight, training, or numbers. If something isn't given, give sensible general guidance rather than making it up.
 - Prioritise protein — the protein target is the one that matters most for training. Favour affordable, high-protein staples.
 - ALWAYS honour stated preferences, allergies, and restrictions (e.g. vegetarian, no dairy, budget). Never suggest something the athlete said they can't or won't eat.
-- Structure the output for a phone: a grocery list grouped by category (Protein, Carbs, Produce, Fats, Extras), then 2–3 simple meal ideas that together roughly hit the daily calorie and protein targets. Note approximate protein per meal.
+- BEGIN your reply with a protein-dense staples block: 5–8 lines, each exactly of the form [[item|<food name>|<protein grams per 100 g, integer>]] with nothing else on the line. Pick staples that fit the targets and any stated restrictions. Use realistic protein densities. Never mention this syntax in prose.
+- Then continue with the rest, structured for a phone: a grocery list grouped by category (Protein, Carbs, Produce, Fats, Extras), then 2–3 simple meal ideas that together roughly hit the daily calorie and protein targets. Note approximate protein per meal.
 - Be concise and skimmable. No long preamble — lead with the list.`;
 
 export type NutritionBriefInput = {

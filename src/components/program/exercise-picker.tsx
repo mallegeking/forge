@@ -32,6 +32,7 @@ export function ExercisePicker({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<ExerciseType>("compound");
+  const [newPlus, setNewPlus] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const q = query.trim().toLowerCase();
@@ -54,6 +55,7 @@ export function ExercisePicker({
         name,
         type: newType,
         defaultRestSeconds: restSecondsFor(newType),
+        isBodyweightPlus: newPlus,
       });
       await addExerciseToDayAction({ dayId, exerciseId: id, ...DEFAULT_RX });
       onDone();
@@ -99,6 +101,20 @@ export function ExercisePicker({
               </Button>
             ))}
           </div>
+          <label className="flex items-start gap-2 rounded-lg bg-muted/40 px-2.5 py-2">
+            <input
+              type="checkbox"
+              checked={newPlus}
+              onChange={(e) => setNewPlus(e.target.checked)}
+              className="mt-0.5 size-4 accent-[var(--primary)]"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm">{t.program.bodyweightPlus}</span>
+              <span className="text-xs text-muted-foreground">
+                {t.program.bodyweightPlusHint}
+              </span>
+            </span>
+          </label>
           <div className="flex gap-1.5">
             <Button
               type="button"

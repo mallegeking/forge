@@ -5,6 +5,26 @@ import Link from "next/link";
 import { Sparkles, KeyRound, Settings, Scale } from "lucide-react";
 import { useT } from "@/components/i18n/i18n-provider";
 
+// The model is instructed (NUTRITION_SYSTEM_PROMPT) to open with structured
+// staples — one "[[item|Chicken breast|23]]" line each — followed by the prose
+// list + meal ideas. We render the items as the design's name-vs-density rows
+// and the rest as prose; if the model skips the protocol, prose still works.
+
+type GroceryItem = { name: string; gramsPer100: string };
+
+const ITEM_RE = /\[\[item\|([^\]|]+)\|([^\]|]+)\]\]/g;
+
+function parseGroceries(raw: string): { items: GroceryItem[]; prose: string } {
+  // Hide a trailing, still-streaming token ("[[ite", "[[item|Chick…").
+  const content = raw.replace(/\[\[[^\]]*$/, "");
+  const items: GroceryItem[] = [];
+  for (const m of content.matchAll(ITEM_RE)) {
+    items.push({ name: m[1].trim(), gramsPer100: m[2].trim() });
+  }
+  const prose = content.replace(ITEM_RE, "").replace(/^\s+/, "").trimEnd();
+  return { items, prose };
+}
+
 // Streams an AI grocery list + meal ideas from /api/nutrition/groceries,
 // mirroring the coach chat's fetch + getReader() pattern and its graceful
 // degradation: 503 → connect a provider, 400 → log a weigh-in first.
@@ -80,6 +100,7 @@ export function NutritionRecommendations() {
   }
 
   const hasOutput = output.length > 0 || streaming;
+  const { items, prose } = parseGroceries(output);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -100,9 +121,28 @@ export function NutritionRecommendations() {
         )}
       </div>
 
-      {hasOutput && (
+      {/* Protein-dense staples as rows: name vs "23 G / 100 G" */}
+      {items.length > 0 && (
+        <div className="flex flex-col gap-2.5 py-1">
+          {items.map((item, i) => (
+            <div
+              key={`${item.name}-${i}`}
+              className="flex items-center justify-between gap-2.5"
+            >
+              <span className="min-w-0 truncate text-[14px] font-semibold">
+                {item.name}
+              </span>
+              <span className="shrink-0 font-display text-[15px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+                {item.gramsPer100} {t.nutrition.grams} / 100 {t.nutrition.grams}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasOutput && (prose || items.length === 0) && (
         <div className="rounded-[14px] bg-card px-4 py-3.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
-          {output || (
+          {prose || (
             <span className="text-muted-foreground">{t.nutrition.planning}</span>
           )}
         </div>

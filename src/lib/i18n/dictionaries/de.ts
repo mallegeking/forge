@@ -121,9 +121,9 @@ export const de: Dictionary = {
     analyzePrompt:
       "Analysiere mein letztes Training und sag mir, worauf ich mich konzentrieren soll — wo ich Gewicht draufpacken kann, was stagniert und wie ich es durchbreche, und worauf ich achten muss.",
     suggestions: [
-      "Worauf sollte ich mich diese Woche konzentrieren?",
+      "Plane einen Deload",
+      "Tausche eine Übung aus",
       "Sind Übungen bereit für mehr Gewicht?",
-      "Ich stagniere — was soll ich ändern?",
     ],
     coaching: "Coaching…",
     placeholder: "Frag deinen Coach…",
@@ -270,6 +270,9 @@ export const de: Dictionary = {
     addTrainingDay: "Trainingstag hinzufügen",
     close: "Schließen",
     exerciseName: "Übungsname",
+    bodyweightPlus: "Körpergewicht + Zusatzlast",
+    bodyweightPlusHint:
+      "Erfasstes Gewicht zählt als Zusatzlast (z. B. Klimmzug mit Gewicht)",
     back: "Zurück",
     createAndAdd: "Erstellen & hinzufügen",
     searchLibrary: "Bibliothek durchsuchen…",
@@ -318,6 +321,8 @@ export const de: Dictionary = {
     sec30: "30 Sek",
     restOver: "Pause vorbei —",
     go: "Los",
+    leaveConfirm:
+      "Training verlassen? Deine erfassten Sätze bleiben gespeichert — du kannst vom Start aus weitermachen.",
   },
 
   receipt: {

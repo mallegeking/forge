@@ -123,9 +123,9 @@ export const en = {
     analyzePrompt:
       "Analyze my recent training and tell me what to prioritize — what to add weight to, what's plateaued and how to break it, and anything to watch.",
     suggestions: [
-      "What should I focus on this week?",
+      "Plan a deload",
+      "Swap an exercise",
       "Any lifts ready for more weight?",
-      "I've plateaued — what do I change?",
     ],
     coaching: "Coaching…",
     placeholder: "Ask your coach…",
@@ -272,6 +272,8 @@ export const en = {
     addTrainingDay: "Add training day",
     close: "Close",
     exerciseName: "Exercise name",
+    bodyweightPlus: "Bodyweight + added load",
+    bodyweightPlusHint: "Logged weight counts as added load (e.g. weighted pull-up)",
     back: "Back",
     createAndAdd: "Create & add",
     searchLibrary: "Search library…",
@@ -320,6 +322,8 @@ export const en = {
     sec30: "30 sec",
     restOver: "Rest over —",
     go: "Go",
+    leaveConfirm:
+      "Leave this workout? Your logged sets stay saved — you can resume from Home.",
   },
 
   receipt: {

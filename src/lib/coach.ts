@@ -28,6 +28,8 @@ export type ExerciseSnapshot = {
   name: string;
   type: ExerciseType;
   injuryNote: string | null;
+  /** Weighted-bodyweight lift — weights are ADDED load ("+7.5kg"). */
+  isBodyweightPlus?: boolean;
   rx: RepRange;
   /** Most-recent session first. Exercises with no history are dropped. */
   sessions: SnapshotSession[];
@@ -66,14 +68,15 @@ How to coach:
 The numbers must come from the data provided — never invent them. At most one card per reply. Keep the status keyword in English; never mention or explain the card syntax in prose.`;
 
 /** Render one session's sets compactly: "40kg 8/8/7", or per-set when weights vary. */
-function formatSession(session: SnapshotSession): string {
+function formatSession(session: SnapshotSession, plus = false): string {
   const { sets } = session;
   if (sets.length === 0) return "—";
+  const pre = plus ? "+" : "";
   const sameWeight = sets.every((s) => s.weightKg === sets[0].weightKg);
   if (sameWeight) {
-    return `${sets[0].weightKg}kg ${sets.map((s) => s.reps).join("/")}`;
+    return `${pre}${sets[0].weightKg}kg ${sets.map((s) => s.reps).join("/")}`;
   }
-  return sets.map((s) => `${s.weightKg}kg×${s.reps}`).join(", ");
+  return sets.map((s) => `${pre}${s.weightKg}kg×${s.reps}`).join(", ");
 }
 
 /** YYYY-MM-DD, the only date granularity the coach needs. */
@@ -86,11 +89,14 @@ function formatExercise(ex: ExerciseSnapshot): string {
   const sessions = ex.sessions.slice(0, MAX_SESSIONS_PER_EXERCISE);
   const rx = ex.rx;
   const header =
-    `${ex.name} (${ex.type}, target ${rx.targetSets}×${rx.repMin}–${rx.repMax})` +
+    `${ex.name} (${ex.type}${ex.isBodyweightPlus ? ", bodyweight + added load" : ""}, target ${rx.targetSets}×${rx.repMin}–${rx.repMax})` +
     (ex.injuryNote ? ` [injury: ${ex.injuryNote}]` : "");
 
   const recent = sessions
-    .map((s) => `${formatSession(s)} on ${isoDate(s.performedAt)}`)
+    .map(
+      (s) =>
+        `${formatSession(s, ex.isBodyweightPlus)} on ${isoDate(s.performedAt)}`
+    )
     .join("; ");
 
   // Progression flags, computed with the same functions the session UI uses.

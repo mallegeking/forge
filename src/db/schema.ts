@@ -47,6 +47,11 @@ export const exercises = sqliteTable("exercises", {
   name: text("name").notNull(),
   type: text("type", { enum: ["compound", "isolation"] }).notNull(),
   defaultRestSeconds: integer("default_rest_seconds").notNull(),
+  // Bodyweight-plus lift (weighted pull-up/dip): logged weights are ADDED load,
+  // shown with a "+" prefix ("+7.5 kg") throughout the UI.
+  isBodyweightPlus: integer("is_bodyweight_plus", { mode: "boolean" })
+    .notNull()
+    .default(false),
   // Permanent injury/flag note (e.g. shoulder, lower back, wrist concerns).
   injuryNote: text("injury_note"),
   createdAt: integer("created_at", { mode: "timestamp" })

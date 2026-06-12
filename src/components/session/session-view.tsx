@@ -115,6 +115,8 @@ export function SessionView({
   const effSets = effSetsOf(ex);
   const targetMet = cur.length >= effSets;
   const isLast = exIndex >= exercises.length - 1;
+  // Bodyweight-plus lifts show their load as ADDED weight: "+7.5 KG × 7".
+  const pre = ex.isBodyweightPlus ? "+" : "";
 
   // Seed the steppers for an exercise: the last set you logged for it, else the
   // first set of last time (lightened on a deload), else the top of the range.
@@ -277,6 +279,7 @@ export function SessionView({
       sets.forEach((s) => (volKg += s.weightKg * s.reps));
       if (sets.length === 0) return;
 
+      const exPre = e.isBodyweightPlus ? "+" : "";
       const bestW = Math.max(...sets.map((s) => s.weightKg));
       const prevBest = e.lastSession
         ? Math.max(...e.lastSession.sets.map((s) => s.weightKg))
@@ -293,7 +296,7 @@ export function SessionView({
         highlights.push({
           name: e.name,
           kind: "PR",
-          tag: `${t.receipt.pr} · ${formatWeight(bestW)} ${t.receipt.kg} × ${bestSet.reps}`,
+          tag: `${t.receipt.pr} · ${exPre}${formatWeight(bestW)} ${t.receipt.kg} × ${bestSet.reps}`,
         });
       } else if (ready) {
         const inc = suggestIncrement(e.type);
@@ -306,7 +309,7 @@ export function SessionView({
         highlights.push({
           name: e.name,
           kind: "HELD",
-          tag: `${t.receipt.held} · ${formatWeight(bestW)} ${t.receipt.kg}`,
+          tag: `${t.receipt.held} · ${exPre}${formatWeight(bestW)} ${t.receipt.kg}`,
         });
       }
     });
@@ -395,7 +398,13 @@ export function SessionView({
         <div className="flex min-w-0 items-center gap-2.5">
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={() => {
+              // Logged sets are already persisted; the confirm only guards
+              // against accidentally leaving mid-workout.
+              const started = logged.some((rows) => rows.length > 0);
+              if (started && !window.confirm(t.session.leaveConfirm)) return;
+              router.push("/");
+            }}
             aria-label={t.common.back}
             className="-m-1.5 p-1.5 text-muted-foreground"
           >
@@ -456,7 +465,7 @@ export function SessionView({
               {formatRelativeDay(ex.lastSession.performedAt, t.common, locale)} ·{" "}
               <span className="text-secondary-foreground/80">
                 {ex.lastSession.sets
-                  .map((s) => formatSet(s.weightKg, s.reps))
+                  .map((s) => `${pre}${formatSet(s.weightKg, s.reps)}`)
                   .join(" · ")}
               </span>
             </>
@@ -478,6 +487,7 @@ export function SessionView({
               {t.session.set} {i + 1}
             </span>
             <span className="flex-1 font-display text-[19px] font-semibold tracking-[0.04em]">
+              {pre}
               {formatWeight(s.weightKg)} {t.session.kg.toUpperCase()} × {s.reps}
             </span>
             <Check className="size-3.5 text-success" strokeWidth={3} />
@@ -504,7 +514,7 @@ export function SessionView({
         <div className="grid grid-cols-2 gap-2.5">
           <Stepper
             label={t.session.weightKgLabel}
-            value={`${formatWeight(weight)}`}
+            value={`${pre}${formatWeight(weight)}`}
             onDec={() => setWeight((w) => Math.max(0, Math.round((w - 2.5) * 100) / 100))}
             onInc={() => setWeight((w) => Math.round((w + 2.5) * 100) / 100)}
             decLabel={`${t.session.decrease} ${t.session.kg}`}
@@ -587,7 +597,7 @@ export function SessionView({
               <div className="mt-3.5 flex items-center gap-1.5">
                 <Check className="size-[13px] text-success" strokeWidth={3} />
                 <span className="text-[13px] text-secondary-foreground">
-                  {t.session.set} {cur.length} {t.session.loggedDash}{" "}
+                  {t.session.set} {cur.length} {t.session.loggedDash} {pre}
                   {formatWeight(lastSet.weightKg)} {t.session.kg} × {lastSet.reps}
                 </span>
               </div>

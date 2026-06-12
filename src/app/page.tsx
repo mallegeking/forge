@@ -273,7 +273,10 @@ export default async function Home() {
         <section className="mx-[22px] mt-3.5 rounded-[14px] bg-card px-4 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <span className="shrink-0 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
-              {t.home.lastSession} · {t.weekdaysShort[ledger.weekday]}
+              {t.home.lastSession} ·{" "}
+              {ledger.performedAt.toDateString() === new Date().toDateString()
+                ? t.common.today
+                : t.weekdaysShort[ledger.weekday]}
             </span>
             <span className="min-w-0 truncate font-semibold text-[11px] tracking-[0.12em] text-primary uppercase">
               {shortDayName(ledger.dayName)}
@@ -290,13 +293,15 @@ export default async function Home() {
               unit={` ${t.home.minShort}`}
               label={t.home.duration}
             />
-            <div className="flex flex-col gap-0.5">
+            <div className="flex min-w-0 flex-col gap-0.5">
               <span className="font-display text-[24px] font-bold leading-none text-success">
                 {ledger.prCount}
                 <span className="text-[14px]"> {t.home.prShort}</span>
               </span>
-              <span className="text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
-                {t.home.records}
+              <span className="truncate text-[9px] tracking-[0.14em] text-muted-foreground uppercase">
+                {ledger.prDetail
+                  ? `${ledger.prDetail.name} ${ledger.prDetail.isBodyweightPlus ? "+" : ""}${formatWeight(ledger.prDetail.weightKg)} ${t.session.kg} ×${ledger.prDetail.reps}`
+                  : t.home.records}
               </span>
             </div>
           </div>

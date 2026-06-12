@@ -222,6 +222,7 @@ export async function createExerciseAction(input: {
   name: string;
   type: ExerciseType;
   defaultRestSeconds: number;
+  isBodyweightPlus?: boolean;
   injuryNote?: string | null;
 }) {
   const id = await createExercise(input);
@@ -234,6 +235,7 @@ export async function updateExerciseAction(input: {
   name?: string;
   type?: ExerciseType;
   defaultRestSeconds?: number;
+  isBodyweightPlus?: boolean;
   injuryNote?: string | null;
 }) {
   const { id, ...values } = input;
