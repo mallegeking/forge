@@ -21,6 +21,7 @@ import {
   logoutAction,
   postponeDeloadAction,
 } from "@/app/actions";
+import { WeekDayCard } from "@/components/home/week-day-card";
 import {
   Flame,
   SlidersHorizontal,
@@ -373,55 +374,17 @@ export default async function Home() {
           </span>
         </div>
         <div className="mt-2.5 flex gap-2 overflow-x-auto px-[22px] pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {days.map((day) => {
-            const isDone = completedDayIds.has(day.id);
-            const isToday = day.dayOfWeek === today;
-            return (
-              <form key={day.id} action={startSessionAction} className="shrink-0">
-                <input type="hidden" name="dayId" value={day.id} />
-                <button
-                  type="submit"
-                  className={`flex h-[98px] w-[96px] flex-col overflow-hidden rounded-[14px] p-3 text-left ${
-                    isToday
-                      ? "border-[1.5px] border-primary bg-card-active"
-                      : "bg-card"
-                  } ${isDone && !isToday ? "opacity-65" : ""}`}
-                >
-                  <span
-                    className={`shrink-0 text-[10px] tracking-[0.18em] uppercase ${
-                      isToday ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    {t.weekdaysShort[day.dayOfWeek]}
-                  </span>
-                  <span className="mt-1 line-clamp-2 shrink-0 font-display text-[18px] font-semibold leading-none uppercase">
-                    {shortDayName(day.name)}
-                  </span>
-                  <span className="mt-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
-                    {isDone ? (
-                      <>
-                        <Check
-                          className="size-[11px] shrink-0 text-success"
-                          strokeWidth={3}
-                        />
-                        <span className="text-[9px] tracking-[0.1em] text-success uppercase">
-                          {t.home.done}
-                        </span>
-                      </>
-                    ) : isToday ? (
-                      <span className="text-[9px] tracking-[0.1em] text-primary uppercase">
-                        {t.home.todayTag}
-                      </span>
-                    ) : (
-                      <span className="text-[9px] tracking-[0.1em] text-muted-foreground uppercase">
-                        {counts.get(day.id) ?? 0} {t.home.exercises}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </form>
-            );
-          })}
+          {days.map((day) => (
+            <WeekDayCard
+              key={day.id}
+              dayId={day.id}
+              dayName={day.name}
+              weekday={day.dayOfWeek}
+              isToday={day.dayOfWeek === today}
+              isDone={completedDayIds.has(day.id)}
+              exerciseCount={counts.get(day.id) ?? 0}
+            />
+          ))}
         </div>
 
         {/* Entry to the program editor — the rail shows the week, this opens

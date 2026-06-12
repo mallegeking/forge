@@ -102,6 +102,9 @@ export const en = {
     done: "Done",
     todayTag: "Today",
     restDayEyebrow: "Rest day",
+    // Confirm before starting a session for a day other than today.
+    trainAnywayPrefix: "Start",
+    trainAnywayMid: "now? Scheduled for",
   },
 
   settings: {

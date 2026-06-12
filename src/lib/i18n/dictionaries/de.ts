@@ -100,6 +100,9 @@ export const de: Dictionary = {
     done: "Fertig",
     todayTag: "Heute",
     restDayEyebrow: "Ruhetag",
+    // Bestätigung, bevor eine Einheit an einem anderen Tag gestartet wird.
+    trainAnywayPrefix: "Jetzt",
+    trainAnywayMid: "starten? Geplant für",
   },
 
   settings: {
