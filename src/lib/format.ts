@@ -3,6 +3,17 @@ export function formatWeight(kg: number): string {
   return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
 }
 
+/**
+ * Compact day name for tight display-type layouts (home hero, week rail,
+ * session/receipt titles): drops any parenthetical detail —
+ * "Lower A (Quad Focus)" → "Lower A". The full name stays visible in the
+ * program editor.
+ */
+export function shortDayName(name: string): string {
+  const short = name.replace(/\s*\([^)]*\)/g, "").trim();
+  return short.length > 0 ? short : name;
+}
+
 /** "60 × 10" style set label. */
 export function formatSet(weightKg: number, reps: number): string {
   return `${formatWeight(weightKg)} × ${reps}`;

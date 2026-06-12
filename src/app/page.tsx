@@ -14,7 +14,7 @@ import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
 import { buildCoachNote } from "@/lib/coach";
 import { weeklyAverages } from "@/lib/bodyweight";
 import { getNutritionConfig } from "@/lib/nutrition-config";
-import { formatWeight } from "@/lib/format";
+import { formatWeight, shortDayName } from "@/lib/format";
 import { getDict } from "@/lib/i18n/server";
 import {
   startSessionAction,
@@ -183,7 +183,7 @@ export default async function Home() {
             : t.home.restDayEyebrow}
         </p>
         <h1 className="mt-2 font-display text-[56px] font-bold leading-[0.92] tracking-[0.01em] uppercase">
-          {todayDay ? todayDay.name : t.home.restDayTitle}
+          {todayDay ? shortDayName(todayDay.name) : t.home.restDayTitle}
         </h1>
         <p className="mt-2.5 text-[12px] tracking-[0.18em] text-muted-foreground uppercase">
           {todayDay
@@ -271,12 +271,12 @@ export default async function Home() {
       {/* Ledger card */}
       {ledger && (
         <section className="mx-[22px] mt-3.5 rounded-[14px] bg-card px-4 py-3.5">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
+          <div className="flex items-center justify-between gap-3">
+            <span className="shrink-0 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
               {t.home.lastSession} · {t.weekdaysShort[ledger.weekday]}
             </span>
-            <span className="font-semibold text-[11px] tracking-[0.12em] text-primary uppercase">
-              {ledger.dayName}
+            <span className="min-w-0 truncate font-semibold text-[11px] tracking-[0.12em] text-primary uppercase">
+              {shortDayName(ledger.dayName)}
             </span>
           </div>
           <div className="mt-2.5 grid grid-cols-3 gap-2.5">
@@ -376,7 +376,7 @@ export default async function Home() {
                 <input type="hidden" name="dayId" value={day.id} />
                 <button
                   type="submit"
-                  className={`flex h-[98px] w-[96px] flex-col rounded-[14px] p-3 text-left ${
+                  className={`flex h-[98px] w-[96px] flex-col overflow-hidden rounded-[14px] p-3 text-left ${
                     isToday
                       ? "border-[1.5px] border-primary bg-card-active"
                       : "bg-card"
@@ -389,8 +389,8 @@ export default async function Home() {
                   >
                     {t.weekdaysShort[day.dayOfWeek]}
                   </span>
-                  <span className="mt-1 font-display text-[18px] font-semibold leading-none uppercase">
-                    {day.name}
+                  <span className="mt-1 line-clamp-2 font-display text-[18px] font-semibold leading-none uppercase">
+                    {shortDayName(day.name)}
                   </span>
                   <span className="mt-auto">
                     {isDone ? (

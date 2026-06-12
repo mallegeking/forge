@@ -16,7 +16,12 @@ import {
   suggestIncrement,
   type RepRange,
 } from "@/lib/progression";
-import { formatWeight, formatSet, formatRelativeDay } from "@/lib/format";
+import {
+  formatWeight,
+  formatSet,
+  formatRelativeDay,
+  shortDayName,
+} from "@/lib/format";
 import { logSetAction, completeSessionAction, saveNoteAction } from "@/app/actions";
 import { useT, useLocale } from "@/components/i18n/i18n-provider";
 import type {
@@ -386,7 +391,7 @@ export function SessionView({
     >
       {/* Header */}
       <header className="flex items-center justify-between px-[22px] pt-[max(env(safe-area-inset-top),12px)]">
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <button
             type="button"
             onClick={() => router.push("/")}
@@ -395,9 +400,9 @@ export function SessionView({
           >
             <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
           </button>
-          <div className="flex flex-col">
-            <span className="font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
-              {view.dayName}
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
+              {shortDayName(view.dayName)}
             </span>
             <span className="mt-1 text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
               {t.session.week} {view.session.weekNumber} ·{" "}
@@ -522,7 +527,7 @@ export function SessionView({
           }`}
           style={{ transition: "background-color 0.25s ease, transform 0.1s ease" }}
         >
-          <span className="font-display text-[20px] font-semibold tracking-[0.14em] uppercase">
+          <span className="truncate px-4 font-display text-[20px] font-semibold tracking-[0.14em] uppercase">
             {primaryLabel}
           </span>
         </button>
@@ -741,7 +746,7 @@ function ReceiptScreen({
           {t.receipt.complete}
         </span>
         <h1 className="mt-2 font-display text-[54px] font-bold leading-[0.92] tracking-[0.02em] uppercase">
-          {dayName}
+          {shortDayName(dayName)}
           <br />
           <span className="text-primary">{t.receipt.forged}</span>
         </h1>
@@ -834,7 +839,8 @@ function ReceiptScreen({
         </button>
         {nextDay && (
           <p className="mt-3 text-center text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
-            {t.receipt.next} · {nextDay.name} · {t.weekdays[nextDay.weekday]}
+            {t.receipt.next} · {shortDayName(nextDay.name)} ·{" "}
+            {t.weekdays[nextDay.weekday]}
           </p>
         )}
       </div>
