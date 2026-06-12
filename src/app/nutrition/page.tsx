@@ -1,14 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ChevronLeft, Flame, Beef, Scale } from "lucide-react";
+import { Utensils, Scale } from "lucide-react";
 import { getNutritionConfig } from "@/lib/nutrition-config";
 import { goalAdjustment } from "@/lib/nutrition";
+import { formatWeight } from "@/lib/format";
 import { getDict } from "@/lib/i18n/server";
-import { Card } from "@/components/ui/card";
+import { GoalSwitcher } from "@/components/nutrition/goal-switcher";
 import { NutritionSettingsForm } from "@/components/nutrition/nutrition-settings-form";
 import { NutritionRecommendations } from "@/components/nutrition/nutrition-recommendations";
 
-export const metadata: Metadata = { title: "Nutrition · Forge" };
+export const metadata: Metadata = { title: "Fuel · Forge" };
 
 // Reads the database directly — render per request, not prerendered at build.
 export const dynamic = "force-dynamic";
@@ -22,65 +23,90 @@ export default async function NutritionPage() {
   const goalLabel = t.nutrition.goalLabels[config.goal];
 
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
-        <Link
-          href="/"
-          aria-label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
-            {t.nutrition.title}
-          </h1>
-          <p className="text-xs text-muted-foreground">{t.nutrition.subtitle}</p>
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
+      {/* Header */}
+      <header className="-mx-[22px] flex items-center justify-between px-[22px] pt-2">
+        <div className="flex items-center gap-2">
+          <Utensils className="size-4 text-primary" strokeWidth={2.2} />
+          <span className="font-display text-xl font-bold tracking-[0.18em] uppercase">
+            {t.tabs.fuel}
+          </span>
         </div>
+        {latestWeightKg != null && (
+          <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+            {t.nutrition.basedOn} {formatWeight(latestWeightKg)}{" "}
+            {t.session.kg.toUpperCase()}
+          </span>
+        )}
       </header>
 
       {targets && latestWeightKg != null ? (
-        <Card className="mb-4 p-4">
-          <div className="flex items-stretch justify-between gap-3">
-            <div className="flex-1">
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Flame className="size-3.5" /> {t.nutrition.calories}
+        <>
+          {/* Target cards */}
+          <section className="grid grid-cols-2 gap-2.5 pt-6">
+            <TargetCard
+              label={t.nutrition.calories}
+              value={targets.calories.toLocaleString()}
+              caption={t.nutrition.kcalPerDay}
+            />
+            <TargetCard
+              label={t.nutrition.protein}
+              value={String(targets.proteinG)}
+              caption={`${t.nutrition.gPerDay} · ${
+                Math.round((targets.proteinG / latestWeightKg) * 10) / 10
+              } ${t.nutrition.gPerKg}`}
+            />
+          </section>
+
+          {/* Derivation — the honest framing */}
+          <section className="mt-3.5 flex flex-col gap-2 rounded-[14px] bg-card px-4 py-3.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[12px] text-muted-foreground">
+                {t.nutrition.maintenance} (
+                {t.nutrition.activityLabels[config.activity].toLowerCase()})
               </span>
-              <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums">
-                {targets.calories.toLocaleString()}
-                <span className="ml-1 text-base font-normal text-muted-foreground">
-                  {t.nutrition.kcal}
-                </span>
-              </p>
-            </div>
-            <div className="w-px bg-foreground/10" />
-            <div className="flex-1">
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Beef className="size-3.5" /> {t.nutrition.protein}
+              <span className="font-display text-[15px] font-semibold tracking-[0.06em]">
+                ≈ {targets.maintenance.toLocaleString()}{" "}
+                {t.nutrition.kcal.toUpperCase()}
               </span>
-              <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums">
-                {targets.proteinG}
-                <span className="ml-1 text-base font-normal text-muted-foreground">
-                  {t.nutrition.grams}
-                </span>
-              </p>
             </div>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[12px] text-muted-foreground">
+                {t.nutrition.goalAdjustment} · {goalLabel}
+              </span>
+              <span
+                className={`font-display text-[15px] font-semibold tracking-[0.06em] ${
+                  goal.kcalDelta !== 0 ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                {goal.kcalDelta > 0 ? "+" : ""}
+                {goal.kcalDelta} {t.nutrition.kcal.toUpperCase()}
+              </span>
+            </div>
+            {targets.source === "override" && (
+              <p className="border-t border-border pt-2 text-[11px] text-muted-foreground">
+                {t.nutrition.manualOverride}
+                {t.nutrition.autoComputedHint}
+              </p>
+            )}
+          </section>
+
+          {/* Goal switcher */}
+          <section className="mt-[18px]">
+            <span className="font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
+              {t.nutrition.goalLabel}
+            </span>
+            <GoalSwitcher config={config} />
+          </section>
+
+          {/* Full settings (activity, overrides, preferences) */}
+          <div className="mt-4">
+            <NutritionSettingsForm current={config} />
           </div>
-          <p className="mt-3 border-t border-foreground/10 pt-3 text-xs text-muted-foreground">
-            {targets.source === "override" ? t.nutrition.manualOverride : ""}
-            {t.nutrition.maintenanceApprox}{" "}
-            {targets.maintenance.toLocaleString()} {t.nutrition.kcal} ·{" "}
-            {t.nutrition.goal} {goalLabel}
-            {goal.kcalDelta !== 0
-              ? ` (${goal.kcalDelta > 0 ? "+" : ""}${goal.kcalDelta})`
-              : ""}{" "}
-            · {t.nutrition.basedOn} {latestWeightKg} kg (
-            {t.nutrition.activityLabels[config.activity]})
-          </p>
-        </Card>
+        </>
       ) : (
-        <Card className="mb-4 flex flex-col items-center gap-3 p-6 text-center">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <section className="mt-6 flex flex-col items-center gap-3 rounded-[16px] bg-card p-6 text-center">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-foreground/[0.07] text-muted-foreground">
             <Scale className="size-5" />
           </div>
           <div>
@@ -91,22 +117,40 @@ export default async function NutritionPage() {
           </div>
           <Link
             href="/bodyweight"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+            className="inline-flex items-center gap-1.5 rounded-[11px] bg-primary px-3.5 py-2.5 text-sm font-medium text-primary-foreground"
           >
             <Scale className="size-4" />
             {t.nutrition.logBodyweight}
           </Link>
-        </Card>
+        </section>
       )}
 
-      <div className="mb-5">
-        <NutritionSettingsForm current={config} />
+      {/* Grocery recommendations (header + refresh live in the component) */}
+      <div className="mt-5">
+        <NutritionRecommendations />
       </div>
+    </div>
+  );
+}
 
-      <h2 className="mb-2 px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {t.nutrition.groceryHeading}
-      </h2>
-      <NutritionRecommendations />
+function TargetCard({
+  label,
+  value,
+  caption,
+}: {
+  label: string;
+  value: string;
+  caption: string;
+}) {
+  return (
+    <div className="rounded-[16px] bg-card px-4 py-[18px]">
+      <span className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+        {label}
+      </span>
+      <div className="mt-2 font-display text-[44px] font-bold leading-[0.95]">
+        {value}
+      </div>
+      <span className="text-[11px] text-muted-foreground">{caption}</span>
     </div>
   );
 }

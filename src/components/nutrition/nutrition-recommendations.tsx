@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Sparkles, KeyRound, Settings, RefreshCw, Scale } from "lucide-react";
+import { Sparkles, KeyRound, Settings, Scale } from "lucide-react";
 import { useT } from "@/components/i18n/i18n-provider";
 
 // Streams an AI grocery list + meal ideas from /api/nutrition/groceries,
@@ -58,87 +55,114 @@ export function NutritionRecommendations() {
 
   if (state === "disabled") {
     return (
-      <Card className="flex flex-col items-center gap-3 p-6 text-center">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-          <KeyRound className="size-5" />
-        </div>
-        <div>
-          <h2 className="font-medium">{t.nutrition.recsOffTitle}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t.nutrition.recsOffBody}
-          </p>
-        </div>
-        <Link
-          href="/settings"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-        >
-          <Settings className="size-4" />
-          {t.coach.openSettings}
-        </Link>
-      </Card>
+      <EmptyCard
+        icon={<KeyRound className="size-5" />}
+        title={t.nutrition.recsOffTitle}
+        body={t.nutrition.recsOffBody}
+        href="/settings"
+        cta={t.coach.openSettings}
+        ctaIcon={<Settings className="size-4" />}
+      />
     );
   }
 
   if (state === "needsWeight") {
     return (
-      <Card className="flex flex-col items-center gap-3 p-6 text-center">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-          <Scale className="size-5" />
-        </div>
-        <div>
-          <h2 className="font-medium">{t.nutrition.needsWeightTitle}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t.nutrition.needsWeightBody}
-          </p>
-        </div>
-        <Link
-          href="/bodyweight"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
-        >
-          <Scale className="size-4" />
-          {t.nutrition.logBodyweight}
-        </Link>
-      </Card>
+      <EmptyCard
+        icon={<Scale className="size-5" />}
+        title={t.nutrition.needsWeightTitle}
+        body={t.nutrition.needsWeightBody}
+        href="/bodyweight"
+        cta={t.nutrition.logBodyweight}
+        ctaIcon={<Scale className="size-4" />}
+      />
     );
   }
 
-  const hasOutput = output.length > 0;
+  const hasOutput = output.length > 0 || streaming;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
+      {/* Section header with the accent refresh link */}
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
+          {t.nutrition.groceryHeading}
+        </span>
+        {hasOutput && (
+          <button
+            type="button"
+            onClick={generate}
+            disabled={streaming}
+            className="font-semibold text-[11px] tracking-[0.12em] text-primary uppercase disabled:opacity-50"
+          >
+            {t.nutrition.refresh} ↻
+          </button>
+        )}
+      </div>
+
       {hasOutput && (
-        <Card className="p-4 text-sm whitespace-pre-wrap break-words">
-          {output ||
-            (streaming ? (
-              <span className="text-muted-foreground">
-                {t.nutrition.planning}
-              </span>
-            ) : null)}
-        </Card>
+        <div className="rounded-[14px] bg-card px-4 py-3.5 text-sm leading-relaxed whitespace-pre-wrap break-words">
+          {output || (
+            <span className="text-muted-foreground">{t.nutrition.planning}</span>
+          )}
+        </div>
       )}
 
-      <Input
+      <input
         value={constraint}
         onChange={(e) => setConstraint(e.target.value)}
         placeholder={t.nutrition.constraintPlaceholder}
-        className="h-11"
+        className="h-12 rounded-[13px] bg-card px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
       />
 
-      <Button onClick={generate} disabled={streaming} className="h-11 w-full gap-1.5">
-        {streaming ? (
-          <span className="text-muted-foreground">{t.nutrition.generating}</span>
-        ) : hasOutput ? (
-          <>
-            <RefreshCw className="size-4" />
-            {t.nutrition.regenerate}
-          </>
-        ) : (
-          <>
-            <Sparkles className="size-4" />
-            {t.nutrition.generate}
-          </>
-        )}
-      </Button>
+      {!hasOutput && (
+        <button
+          type="button"
+          onClick={generate}
+          disabled={streaming}
+          className="flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[12px] bg-primary text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
+        >
+          <Sparkles className="size-4" />
+          <span className="font-display text-[17px] font-semibold tracking-[0.14em] uppercase">
+            {streaming ? t.nutrition.generating : t.nutrition.generate}
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyCard({
+  icon,
+  title,
+  body,
+  href,
+  cta,
+  ctaIcon,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  href: string;
+  cta: string;
+  ctaIcon: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-[16px] bg-card p-6 text-center">
+      <div className="flex size-11 items-center justify-center rounded-xl bg-foreground/[0.07] text-muted-foreground">
+        {icon}
+      </div>
+      <div>
+        <h2 className="font-medium">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+      </div>
+      <Link
+        href={href}
+        className="inline-flex items-center gap-1.5 rounded-[11px] bg-primary px-3.5 py-2.5 text-sm font-medium text-primary-foreground"
+      >
+        {ctaIcon}
+        {cta}
+      </Link>
     </div>
   );
 }

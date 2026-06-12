@@ -128,6 +128,11 @@ export const de: Dictionary = {
     coaching: "Coaching…",
     placeholder: "Frag deinen Coach…",
     send: "Senden",
+    seesData: "Sieht all deine Daten",
+    lastN: "Letzte",
+    liftReady: "Bereit ↑",
+    liftPlateau: "Plateau",
+    liftHold: "Halten",
   },
 
   coachNote: {
@@ -143,6 +148,9 @@ export const de: Dictionary = {
     subtitle: "Wochenschnitt & Trend",
     latest: "Aktuell",
     weeksShort: "Wo.",
+    weeksTracked: "Wochen erfasst",
+    over: "über",
+    weeksWord: "Wochen",
     empty: "Erfasse unten deine erste Wiegung, um zu starten.",
     weeklyAverage: "Wochenschnitt",
     chartLabel: "Wöchentlicher Gewichtsschnitt über die Zeit",
@@ -161,6 +169,12 @@ export const de: Dictionary = {
     kcal: "kcal",
     protein: "Protein",
     grams: "g",
+    kcalPerDay: "kcal / Tag",
+    gPerDay: "g / Tag",
+    gPerKg: "g pro kg",
+    maintenance: "Erhaltung",
+    goalAdjustment: "Zielanpassung",
+    refresh: "Aktualisieren",
     manualOverride: "Manuell überschrieben · ",
     maintenanceApprox: "Erhaltung ≈",
     goal: "Ziel:",
@@ -224,6 +238,7 @@ export const de: Dictionary = {
   },
 
   program: {
+    title: "Programm",
     noActive: "Kein aktives Programm.",
     daySplit: "-Tage-Split",
     done: "Fertig",

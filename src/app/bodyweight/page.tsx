@@ -1,15 +1,13 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { ChevronLeft, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Scale } from "lucide-react";
 import { getBodyweightEntries } from "@/lib/queries";
 import { weeklyAverages, bodyweightTrend } from "@/lib/bodyweight";
-import { LineChart } from "@/components/charts/line-chart";
-import { Card } from "@/components/ui/card";
+import { BodyweightChart } from "@/components/charts/bodyweight-chart";
 import { formatWeight } from "@/lib/format";
 import { getDict } from "@/lib/i18n/server";
 import { BodyweightTracker } from "@/components/bodyweight/bodyweight-tracker";
 
-export const metadata: Metadata = { title: "Bodyweight · Forge" };
+export const metadata: Metadata = { title: "Body · Forge" };
 
 // Reads the database directly — render per request, not prerendered at build.
 export const dynamic = "force-dynamic";
@@ -21,68 +19,68 @@ export default async function BodyweightPage() {
   );
   const trend = bodyweightTrend(weekly);
   const latest = entries.at(-1) ?? null;
-  const chartData = weekly.map((w) => ({ label: w.label, value: w.avgWeightKg }));
-
-  const TrendIcon = trend == null || trend === 0 ? Minus : trend < 0 ? TrendingDown : TrendingUp;
 
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
-        <Link
-          href="/"
-          aria-label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
-            {t.bodyweight.title}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            {t.bodyweight.subtitle}
-          </p>
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] pb-2">
+      {/* Header */}
+      <header className="flex items-center justify-between px-[22px] pt-2">
+        <div className="flex items-center gap-2">
+          <Scale className="size-4 text-primary" strokeWidth={2.2} />
+          <span className="font-display text-xl font-bold tracking-[0.18em] uppercase">
+            {t.tabs.body}
+          </span>
         </div>
+        <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          {weekly.length} {t.bodyweight.weeksTracked}
+        </span>
       </header>
 
-      <Card className="mb-4 p-4">
-        {latest ? (
-          <div className="flex items-end justify-between">
+      {latest ? (
+        <>
+          {/* Hero: latest weight + trend over the tracked weeks */}
+          <section className="flex items-end justify-between px-[22px] pt-[26px]">
             <div>
-              <span className="text-xs text-muted-foreground">
+              <span className="font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
                 {t.bodyweight.latest}
               </span>
-              <p className="text-2xl font-semibold tracking-tight tabular-nums">
-                {formatWeight(latest.weightKg)}{" "}
-                <span className="text-base font-normal text-muted-foreground">
-                  kg
-                </span>
-              </p>
+              <div className="mt-1 font-display text-[72px] font-bold leading-[0.9]">
+                {formatWeight(latest.weightKg)}
+                <span className="text-[28px] text-muted-foreground"> kg</span>
+              </div>
             </div>
             {trend != null && (
-              <span className="flex items-center gap-1 text-sm text-muted-foreground tabular-nums">
-                <TrendIcon className="size-4" />
-                {trend > 0 ? "+" : ""}
-                {formatWeight(trend)} kg · {weekly.length} {t.bodyweight.weeksShort}
-              </span>
+              <div className="flex flex-col items-end gap-1 pb-1.5">
+                <span
+                  className={`font-display text-[22px] font-semibold ${
+                    trend <= 0 ? "text-success" : "text-foreground"
+                  }`}
+                >
+                  {trend > 0 ? "+" : trend < 0 ? "−" : "±"}
+                  {formatWeight(Math.abs(trend))} {t.session.kg.toUpperCase()}
+                </span>
+                <span className="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+                  {t.bodyweight.over} {weekly.length} {t.bodyweight.weeksWord}
+                </span>
+              </div>
             )}
-          </div>
-        ) : (
-          <p className="py-2 text-center text-sm text-muted-foreground">
-            {t.bodyweight.empty}
-          </p>
-        )}
-      </Card>
+          </section>
 
-      {weekly.length > 0 && (
-        <Card className="mb-4 py-4">
-          <div className="px-4">
-            <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {t.bodyweight.weeklyAverage}
-            </p>
-            <LineChart data={chartData} ariaLabel={t.bodyweight.chartLabel} />
-          </div>
-        </Card>
+          {/* Weekly-average chart */}
+          {weekly.length > 0 && (
+            <section className="mx-[22px] mt-[22px] rounded-[16px] bg-card p-4">
+              <span className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+                {t.bodyweight.weeklyAverage}
+              </span>
+              <BodyweightChart
+                points={weekly.map((w) => ({ value: w.avgWeightKg }))}
+              />
+            </section>
+          )}
+        </>
+      ) : (
+        <p className="px-[22px] py-16 text-center text-sm text-muted-foreground">
+          {t.bodyweight.empty}
+        </p>
       )}
 
       <BodyweightTracker entries={entries} />

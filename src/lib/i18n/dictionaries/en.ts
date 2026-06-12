@@ -130,6 +130,11 @@ export const en = {
     coaching: "Coaching…",
     placeholder: "Ask your coach…",
     send: "Send",
+    seesData: "Sees all your data",
+    lastN: "Last",
+    liftReady: "Ready ↑",
+    liftPlateau: "Plateau",
+    liftHold: "Hold",
   },
 
   coachNote: {
@@ -145,6 +150,9 @@ export const en = {
     subtitle: "Weekly average & trend",
     latest: "Latest",
     weeksShort: "wks",
+    weeksTracked: "weeks tracked",
+    over: "over",
+    weeksWord: "weeks",
     empty: "Log your first weigh-in below to start tracking.",
     weeklyAverage: "Weekly average",
     chartLabel: "Bodyweight weekly average over time",
@@ -163,6 +171,12 @@ export const en = {
     kcal: "kcal",
     protein: "Protein",
     grams: "g",
+    kcalPerDay: "kcal / day",
+    gPerDay: "g / day",
+    gPerKg: "g per kg",
+    maintenance: "Maintenance",
+    goalAdjustment: "Goal adjustment",
+    refresh: "Refresh",
     manualOverride: "Manual override · ",
     maintenanceApprox: "maintenance ≈",
     goal: "goal:",
@@ -226,6 +240,7 @@ export const en = {
   },
 
   program: {
+    title: "Program",
     noActive: "No active program.",
     daySplit: "-day split",
     done: "Done",

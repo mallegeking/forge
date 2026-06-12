@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Archive,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   Pencil,
   Plus,
@@ -39,6 +40,11 @@ export type DayBlock = { day: ProgramDay; exercises: DayExercise[] };
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 
+/** ISO weekday for today: 1 = Monday … 7 = Sunday. */
+function todayWeekday(): number {
+  return ((new Date().getDay() + 6) % 7) + 1;
+}
+
 export function ProgramEditor({
   program,
   programs,
@@ -54,82 +60,166 @@ export function ProgramEditor({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div>
-      <div className="mb-3 flex justify-end">
-        <Button
-          variant={editing ? "default" : "outline"}
-          size="sm"
-          onClick={() => setEditing((e) => !e)}
-          className="gap-1"
-        >
-          {editing ? <Check className="size-3.5" /> : <Pencil className="size-3.5" />}
-          {editing ? t.program.done : t.program.edit}
-        </Button>
-      </div>
-
-      {editing && <ProgramManager program={program} programs={programs} />}
-
-      {editing ? (
-        <div className="flex flex-col gap-4">
-          {days.map(({ day, exercises }) => (
-            <EditableDay
-              key={day.id}
-              day={day}
-              exercises={exercises}
-              library={library}
-            />
-          ))}
-          <AddDay programId={program.id} nextWeekday={nextFreeWeekday(days)} />
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
+      {/* Header: back · PROGRAM wordmark + caption · EDIT pill */}
+      <header className="-mx-[22px] flex items-center justify-between px-[22px] pt-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link
+            href="/"
+            aria-label={t.common.back}
+            className="-m-1.5 shrink-0 p-1.5 text-muted-foreground"
+          >
+            <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
+          </Link>
+          <div className="flex min-w-0 flex-col">
+            <span className="font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
+              {t.program.title}
+            </span>
+            <span className="mt-1 truncate text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+              {days.length}
+              {t.program.daySplit} · {t.program.active}
+            </span>
+          </div>
         </div>
-      ) : (
-        <ReadOnlyDays days={days} />
-      )}
+        <button
+          type="button"
+          onClick={() => setEditing((e) => !e)}
+          className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-[7px] ${
+            editing
+              ? "bg-primary text-primary-foreground"
+              : "border border-input text-foreground"
+          }`}
+        >
+          {editing ? (
+            <Check className="size-3" strokeWidth={2.2} />
+          ) : (
+            <Pencil className="size-3" strokeWidth={2.2} />
+          )}
+          <span className="font-display text-[13px] font-semibold tracking-[0.14em] uppercase">
+            {editing ? t.program.done : t.program.edit}
+          </span>
+        </button>
+      </header>
+
+      <div className="pt-[18px]">
+        {editing && <ProgramManager program={program} programs={programs} />}
+
+        {editing ? (
+          <div className="flex flex-col gap-4">
+            {days.map(({ day, exercises }) => (
+              <EditableDay
+                key={day.id}
+                day={day}
+                exercises={exercises}
+                library={library}
+              />
+            ))}
+            <AddDay programId={program.id} nextWeekday={nextFreeWeekday(days)} />
+          </div>
+        ) : (
+          <CollapsibleDays days={days} />
+        )}
+      </div>
     </div>
   );
 }
 
-// --- View mode -------------------------------------------------------------
+// --- View mode: collapsible day rows ----------------------------------------
 
-function ReadOnlyDays({ days }: { days: DayBlock[] }) {
+function CollapsibleDays({ days }: { days: DayBlock[] }) {
   const t = useT();
+  // Today's training day starts expanded — it's the one you came to check.
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    const today = days.find((d) => d.day.dayOfWeek === todayWeekday());
+    return new Set(today ? [today.day.id] : []);
+  });
+
+  const toggle = (id: string) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   return (
-    <div className="flex flex-col gap-4">
-      {days.map(({ day, exercises }) => (
-        <Card key={day.id} className="py-4">
-          <div className="flex items-baseline justify-between px-4">
-            <h2 className="font-medium">{day.name}</h2>
-            <span className="text-xs text-muted-foreground">
-              {t.weekdays[day.dayOfWeek]}
-            </span>
-          </div>
-          <ul className="flex flex-col">
-            {exercises.map((ex) => (
-              <li
-                key={ex.prescriptionId}
-                className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-2 text-sm last:border-b-0"
-              >
-                <Link
-                  href={`/exercises/${ex.exerciseId}`}
-                  className="flex min-w-0 items-center gap-1.5 hover:text-primary"
+    <div className="flex flex-col gap-2">
+      {days.map(({ day, exercises }) => {
+        const open = openIds.has(day.id);
+        return (
+          <div
+            key={day.id}
+            className={`rounded-[14px] bg-card ${
+              open ? "border border-primary/35 px-4 pt-3 pb-1.5" : "px-4 py-3"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggle(day.id)}
+              aria-expanded={open}
+              className="flex w-full items-center justify-between gap-2.5"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span
+                  className={`w-[30px] shrink-0 text-left text-[10px] tracking-[0.18em] uppercase ${
+                    open ? "text-primary" : "text-muted-foreground"
+                  }`}
                 >
-                  {ex.injuryNote && (
-                    <AlertTriangle className="size-3.5 shrink-0 text-destructive" />
-                  )}
-                  <span className="truncate">{ex.name}</span>
-                </Link>
-                <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {ex.targetSets} × {ex.repMin}–{ex.repMax}
+                  {t.weekdaysShort[day.dayOfWeek]}
                 </span>
-              </li>
-            ))}
-            {exercises.length === 0 && (
-              <li className="px-4 py-2 text-sm text-muted-foreground">
-                {t.program.noExercises}
-              </li>
+                <span className="truncate font-display text-[19px] font-semibold tracking-[0.06em] uppercase">
+                  {day.name}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2.5">
+                {!open && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {exercises.length} {t.home.exercises}
+                  </span>
+                )}
+                {open ? (
+                  <ChevronUp className="size-[13px] text-muted-foreground" strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown className="size-[13px] text-muted-foreground" strokeWidth={2.4} />
+                )}
+              </span>
+            </button>
+
+            {open && (
+              <ul className="mt-2.5 flex flex-col">
+                {exercises.map((ex, i) => (
+                  <li
+                    key={ex.prescriptionId}
+                    className={`flex items-center justify-between gap-2.5 py-2 ${
+                      i < exercises.length - 1
+                        ? "border-b border-foreground/[0.06]"
+                        : ""
+                    }`}
+                  >
+                    <Link
+                      href={`/exercises/${ex.exerciseId}`}
+                      className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium hover:text-primary"
+                    >
+                      {ex.injuryNote && (
+                        <AlertTriangle className="size-3.5 shrink-0 text-destructive" />
+                      )}
+                      <span className="truncate">{ex.name}</span>
+                    </Link>
+                    <span className="shrink-0 font-display text-[14px] font-semibold tracking-[0.08em] text-muted-foreground">
+                      {ex.targetSets} × {ex.repMin}–{ex.repMax}
+                    </span>
+                  </li>
+                ))}
+                {exercises.length === 0 && (
+                  <li className="py-2 text-[13px] text-muted-foreground">
+                    {t.program.noExercises}
+                  </li>
+                )}
+              </ul>
             )}
-          </ul>
-        </Card>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -478,18 +568,20 @@ function AddDay({ programId, nextWeekday }: { programId: string; nextWeekday: nu
   const t = useT();
   const [, startTransition] = useTransition();
   return (
-    <Button
-      variant="outline"
+    <button
+      type="button"
       onClick={() =>
         startTransition(() =>
           void addProgramDayAction({ programId, name: t.program.newDay, dayOfWeek: nextWeekday })
         )
       }
-      className="h-11 w-full gap-1.5"
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-[13px] border-[1.5px] border-dashed border-foreground/20 text-muted-foreground"
     >
-      <Plus className="size-4" />
-      {t.program.addTrainingDay}
-    </Button>
+      <Plus className="size-3.5" strokeWidth={2.4} />
+      <span className="font-display text-[15px] font-semibold tracking-[0.14em] uppercase">
+        {t.program.addTrainingDay}
+      </span>
+    </button>
   );
 }
 

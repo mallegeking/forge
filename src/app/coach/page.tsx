@@ -1,6 +1,5 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { ChevronLeft } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { CoachChat } from "@/components/coach/coach-chat";
 import { getDict } from "@/lib/i18n/server";
 
@@ -12,22 +11,21 @@ export default async function CoachPage({
   searchParams: Promise<{ ask?: string }>;
 }) {
   const [{ ask }, t] = await Promise.all([searchParams, getDict()]);
+
+  // Full-height chat column: header pinned, messages scroll, composer at the
+  // bottom (above the tab bar). Cancels the layout's gutters/padding.
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
-        <Link
-          href="/"
-          aria-label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
+    <div className="-mx-4 -mt-5 -mb-28 flex h-dvh flex-col animate-[fadeIn_0.3s_ease]">
+      <header className="flex shrink-0 items-center justify-between px-[22px] pt-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" fill="currentColor" />
+          <span className="font-display text-xl font-bold tracking-[0.18em] uppercase">
             {t.coach.title}
-          </h1>
-          <p className="text-xs text-muted-foreground">{t.coach.subtitle}</p>
+          </span>
         </div>
+        <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          {t.coach.seesData}
+        </span>
       </header>
 
       <CoachChat initialInput={ask ?? ""} />
