@@ -64,8 +64,8 @@ How to coach:
 - During a deload week, hold load back — do not tell the athlete to add weight.
 - Keep it concise and skimmable (this is a phone). Lead with what matters most. Use short paragraphs or tight bullets. Warm, direct, no filler.
 - When (and only when) your advice centres on ONE specific exercise whose recent numbers appear in the data, you may attach a compact lift card by writing, on its own line, exactly:
-[[lift|<exercise name>|<current kg>|<suggested next kg>|<READY or PLATEAU or HOLD>|<recent per-session reps, oldest first, e.g. 10·10·9 → 10·10·10>]]
-The numbers must come from the data provided — never invent them. At most one card per reply. Keep the status keyword in English; never mention or explain the card syntax in prose.`;
+[[lift|<exercise name>|<current weight>|<suggested next weight>|<READY or PLATEAU or HOLD>|<recent per-session reps, oldest first, e.g. 10·10·9 → 10·10·10>]]
+The two weight fields are bare numbers in kg — digits only, no unit (write 57.5, not "57.5 kg"). The numbers must come from the data provided — never invent them. At most one card per reply. Keep the status keyword in English; never mention or explain the card syntax in prose.`;
 
 /** Render one session's sets compactly: "40kg 8/8/7", or per-set when weights vary. */
 function formatSession(session: SnapshotSession, plus = false): string {

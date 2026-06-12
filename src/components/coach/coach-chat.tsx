@@ -37,12 +37,14 @@ function parseCoachContent(raw: string): Part[] {
     const fields = m[1].split("|").map((f) => f.trim());
     // Malformed tokens (too few fields) are dropped rather than shown raw.
     if (fields.length >= 5) {
+      // Models sometimes write "57.5 kg" despite the spec — keep numbers only.
+      const num = (s: string) => s.replace(/[^\d.,]/g, "") || s;
       parts.push({
         kind: "lift",
         card: {
           name: fields[0],
-          from: fields[1],
-          to: fields[2],
+          from: num(fields[1]),
+          to: num(fields[2]),
           status: fields[3].toUpperCase(),
           history: fields.slice(4).join("|"),
         },

@@ -8,7 +8,11 @@ import type { CoachProvider } from "./coach-provider";
 
 export type CoachMessage = { role: "user" | "assistant"; content: string };
 
-const MAX_TOKENS = 2048;
+// Generous cap: reasoning models (e.g. Gemini 2.5) count their hidden
+// thinking against max_tokens — 2048 left replies truncated mid-sentence
+// once the training brief made the model think long. Billing follows actual
+// usage, not the cap.
+const MAX_TOKENS = 8192;
 
 export async function* streamCoach(
   provider: CoachProvider,
@@ -78,6 +82,20 @@ async function* streamOpenAICompatible(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+
+  function* drainLine(line: string): Generator<string> {
+    if (!line.startsWith("data:")) return;
+    const data = line.slice(5).trim();
+    if (data === "[DONE]") return;
+    try {
+      const json = JSON.parse(data);
+      const delta = json?.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta.length > 0) yield delta;
+    } catch {
+      // keep-alive comment or a split frame — ignore
+    }
+  }
+
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -87,16 +105,14 @@ async function* streamOpenAICompatible(
     while ((nl = buffer.indexOf("\n")) !== -1) {
       const line = buffer.slice(0, nl).trim();
       buffer = buffer.slice(nl + 1);
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (data === "[DONE]") return;
-      try {
-        const json = JSON.parse(data);
-        const delta = json?.choices?.[0]?.delta?.content;
-        if (typeof delta === "string" && delta.length > 0) yield delta;
-      } catch {
-        // keep-alive comment or a split frame — ignore and read more
-      }
+      yield* drainLine(line);
     }
+  }
+
+  // Some providers end the stream without a trailing newline on the final
+  // frame — drain what's left in the buffer or the last delta is lost.
+  buffer += decoder.decode();
+  for (const raw of buffer.split("\n")) {
+    yield* drainLine(raw.trim());
   }
 }
