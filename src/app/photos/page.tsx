@@ -15,20 +15,25 @@ export default async function PhotosPage() {
   const [photos, t] = await Promise.all([getProgressPhotos(), getDict()]);
 
   return (
-    <div>
-      <header className="mb-4 flex items-center gap-2">
-        <Link
-          href="/"
-          aria-label={t.common.back}
-          className="-ml-2 flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold tracking-tight">
-            {t.photos.title}
-          </h1>
-          <p className="text-xs text-muted-foreground">{t.photos.subtitle}</p>
+    <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
+      {/* Reached from the Body screen's camera icon, so back goes there. */}
+      <header className="-mx-[22px] flex items-center justify-between px-[22px] pt-2 pb-[18px]">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link
+            href="/bodyweight"
+            aria-label={t.common.back}
+            className="-m-1.5 shrink-0 p-1.5 text-muted-foreground"
+          >
+            <ChevronLeft className="size-[18px]" strokeWidth={2.2} />
+          </Link>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
+              {t.photos.title}
+            </span>
+            <span className="mt-1 truncate text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+              {t.photos.subtitle}
+            </span>
+          </div>
         </div>
       </header>
 

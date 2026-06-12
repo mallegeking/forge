@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Scale } from "lucide-react";
+import Link from "next/link";
+import { Scale, Camera } from "lucide-react";
 import { getBodyweightEntries } from "@/lib/queries";
 import { weeklyAverages, bodyweightTrend } from "@/lib/bodyweight";
 import { BodyweightChart } from "@/components/charts/bodyweight-chart";
@@ -30,9 +31,18 @@ export default async function BodyweightPage() {
             {t.tabs.body}
           </span>
         </div>
-        <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-          {weekly.length} {t.bodyweight.weeksTracked}
-        </span>
+        <div className="flex items-center gap-3.5">
+          <span className="text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+            {weekly.length} {t.bodyweight.weeksTracked}
+          </span>
+          <Link
+            href="/photos"
+            aria-label={t.home.photosTitle}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Camera className="size-[17px]" strokeWidth={2.2} />
+          </Link>
+        </div>
       </header>
 
       {latest ? (
