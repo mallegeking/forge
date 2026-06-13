@@ -7,7 +7,20 @@
       "Bash(yes \"N\")",
       "Bash(cp -r D:/Projects/multipee-temp/. \"D:/Projects/MultiPee/\")",
       "Bash(rm -rf D:/Projects/multipee-temp)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 8416 //F)",
+      "Bash(xargs cat)",
+      "Bash(PowerShell -Command \"Get-ChildItem 'node_modules/next/dist/docs/02-pages/04-api-reference/04-config/01-next-config-js' | Select-Object Name | Sort-Object Name\")",
+      "Bash(PowerShell -Command \"Get-Content 'node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md' | Measure-Object -Line | Select-Object -ExpandProperty Lines\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node -e \"const l=require\\('lucide-react'\\); ['House','Home','MessageCircle','MessagesSquare','Utensils','UtensilsCrossed','Scale','Flame','Dumbbell','SlidersHorizontal','LockKeyhole','ChevronRight','Check','Sparkles'].forEach\\(n=>console.log\\(n, !!l[n]\\)\\)\")",
+      "Bash(npx tsc *)"
     ]
   }
 }
