@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    image: multipee-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # The libsql database lives on the mounted volume below.
+      TURSO_DATABASE_URL: file:/app/data/local.db
+      # Required — set this in a .env file next to this compose file.
+      APP_PASSCODE: ${APP_PASSCODE:?set APP_PASSCODE in .env}
+    volumes:
+      - ./data:/app/data
+    # Only listen on the host's loopback; Tailscale will publish it to your tailnet.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # One-off helper image (has dev deps: drizzle-kit + tsx) for schema + seeding.
+  # It never starts with `up` — invoke it explicitly with `docker compose run`.
+  db-tools:
+    build:
+      context: .
+      target: builder
+    image: multipee-db-tools
+    profiles: ["tools"]
+    environment:
+      TURSO_DATABASE_URL: file:/app/data/local.db
+    volumes:
+      - ./data:/app/data

@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+data
+*.db
+*.db-wal
+*.db-shm
+.env*
+npm-debug.log*
+.claude
+.vscode
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
