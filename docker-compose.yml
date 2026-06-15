@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      # "Today"/"this week" are computed from the server's local clock, so the
+      # container's timezone must match yours — otherwise it shows the previous
+      # day's workout between local midnight and the UTC offset. Override in .env.
+      TZ: ${TZ:-Europe/Berlin}
       # The libsql database lives on the mounted volume below.
       TURSO_DATABASE_URL: file:/app/data/local.db
       # Required — set this in a .env file next to this compose file.
