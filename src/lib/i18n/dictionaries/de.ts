@@ -336,6 +336,11 @@ export const de: Dictionary = {
     go: "Los",
     leaveConfirm:
       "Training verlassen? Deine erfassten Sätze bleiben gespeichert — du kannst vom Start aus weitermachen.",
+    finishConfirm:
+      "Einige Übungen sind noch nicht fertig. Trotzdem beenden?",
+    continueWorkout: "Training fortsetzen",
+    step: "Schritt",
+    editWeightLabel: "Gewicht bearbeiten",
   },
 
   receipt: {

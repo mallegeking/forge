@@ -337,6 +337,11 @@ export const en = {
     go: "Go",
     leaveConfirm:
       "Leave this workout? Your logged sets stay saved — you can resume from Home.",
+    finishConfirm:
+      "Some exercises aren't finished yet. Finish anyway?",
+    continueWorkout: "Continue workout",
+    step: "Step",
+    editWeightLabel: "Edit weight",
   },
 
   receipt: {

@@ -7,6 +7,7 @@ import { AUTH_COOKIE, checkPasscode, sessionToken } from "@/lib/auth";
 import {
   startOrResumeSession,
   completeSession,
+  reopenSession,
   postponeDeload,
   resetTrainingProgress,
   logSet,
@@ -103,6 +104,12 @@ export async function finishSessionAction(formData: FormData) {
  */
 export async function completeSessionAction(input: { sessionId: string }) {
   await completeSession(input.sessionId);
+  revalidatePath("/");
+}
+
+/** Reopen a just-finished session so the user can keep logging. */
+export async function reopenSessionAction(input: { sessionId: string }) {
+  await reopenSession(input.sessionId);
   revalidatePath("/");
 }
 

@@ -1,6 +1,7 @@
-/** Format a weight without a trailing ".0" (e.g. 60, 57.5). */
+/** Format a weight without trailing zeros (e.g. 60, 57.5, 47.25) — keeps up to
+    2 decimals so finer machine increments render exactly. */
 export function formatWeight(kg: number): string {
-  return Number.isInteger(kg) ? String(kg) : kg.toFixed(1);
+  return Number.isInteger(kg) ? String(kg) : parseFloat(kg.toFixed(2)).toString();
 }
 
 /**

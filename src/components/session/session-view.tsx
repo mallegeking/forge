@@ -31,7 +31,12 @@ import {
   formatRelativeDay,
   shortDayName,
 } from "@/lib/format";
-import { logSetAction, completeSessionAction, saveNoteAction } from "@/app/actions";
+import {
+  logSetAction,
+  completeSessionAction,
+  reopenSessionAction,
+  saveNoteAction,
+} from "@/app/actions";
 import { useT, useLocale } from "@/components/i18n/i18n-provider";
 import type {
   SessionView as SessionViewData,
@@ -149,6 +154,9 @@ export function SessionView({
 
   const [weight, setWeight] = useState(() => seedFor(initialIndex, exercises.map((e) => e.loggedSets)).weight);
   const [reps, setReps] = useState(() => seedFor(initialIndex, exercises.map((e) => e.loggedSets)).reps);
+  // Per-tap weight increment — cycles through machine-friendly steps so fixed
+  // machines (e.g. a 2 kg or 5 kg pin) can be dialled in as fast as plates.
+  const [weightStep, setWeightStep] = useState(2.5);
 
   // --- Clock + rest timer (driven off absolute timestamps) ------------------
   const [now, setNow] = useState(() => Date.now());
@@ -284,6 +292,13 @@ export function SessionView({
   }, [cur.length, weight, reps, effSets, ex, exIndex, view.session.id, ensureAudio, startTransition]);
 
   const finish = useCallback(() => {
+    // Guard against an accidental finish: if any exercise still has sets to log,
+    // confirm before sealing the session.
+    const incomplete = exercises.filter(
+      (e, i) => (logged[i] ?? []).length < effSetsOf(e)
+    ).length;
+    if (incomplete > 0 && !window.confirm(t.session.finishConfirm)) return;
+
     let volKg = 0;
     let totalSets = 0;
     const highlights: Highlight[] = [];
@@ -345,7 +360,16 @@ export function SessionView({
     startTransition(async () => {
       await completeSessionAction({ sessionId: view.session.id });
     });
-  }, [exercises, logged, rxOf, clockBase, t, view.session.id, startTransition]);
+  }, [exercises, logged, effSetsOf, rxOf, clockBase, t, view.session.id, startTransition]);
+
+  // Reopen a finished session from the receipt and drop back into logging.
+  const continueWorkout = useCallback(() => {
+    setReceipt(null);
+    setScreen("session");
+    startTransition(async () => {
+      await reopenSessionAction({ sessionId: view.session.id });
+    });
+  }, [view.session.id, startTransition]);
 
   const saveNote = useCallback(() => {
     const value = notes[ex.exerciseId] ?? "";
@@ -372,6 +396,7 @@ export function SessionView({
         weekTotal={weekTotal}
         nextDay={nextDay}
         onDone={() => router.push("/")}
+        onContinue={continueWorkout}
       />
     );
   }
@@ -440,16 +465,24 @@ export function SessionView({
         </span>
       </header>
 
-      {/* Progress segments */}
+      {/* Progress segments — tap one to jump to that exercise (incl. skipped). */}
       <div
         className="mx-[22px] mt-4 grid gap-1"
         style={{ gridTemplateColumns: `repeat(${exercises.length}, 1fr)` }}
       >
         {segs.map((bg, i) => (
-          <div
+          <button
             key={i}
-            className={`h-1 rounded-[2px] transition-colors duration-300 ${bg}`}
-          />
+            type="button"
+            onClick={() => moveTo(i)}
+            aria-label={`${t.session.exercise} ${i + 1}`}
+            aria-current={i === exIndex ? "step" : undefined}
+            className="-my-2 flex items-center py-2"
+          >
+            <span
+              className={`h-1 w-full rounded-[2px] transition-colors duration-300 ${bg}`}
+            />
+          </button>
         ))}
       </div>
 
@@ -541,10 +574,21 @@ export function SessionView({
           <Stepper
             label={t.session.weightKgLabel}
             value={`${pre}${formatWeight(weight)}`}
-            onDec={() => setWeight((w) => Math.max(0, Math.round((w - 2.5) * 100) / 100))}
-            onInc={() => setWeight((w) => Math.round((w + 2.5) * 100) / 100)}
+            onDec={() => setWeight((w) => Math.max(0, Math.round((w - weightStep) * 100) / 100))}
+            onInc={() => setWeight((w) => Math.round((w + weightStep) * 100) / 100)}
             decLabel={`${t.session.decrease} ${t.session.kg}`}
             incLabel={`${t.session.increase} ${t.session.kg}`}
+            editValue={weight}
+            editLabel={t.session.editWeightLabel}
+            onEditCommit={(n) => setWeight(Math.max(0, Math.round(n * 100) / 100))}
+            footer={
+              <StepSelect
+                step={weightStep}
+                onSelect={setWeightStep}
+                label={t.session.step}
+                unit={t.session.kg}
+              />
+            }
           />
           <Stepper
             label={t.session.repsLabel}
@@ -691,6 +735,10 @@ function Stepper({
   onInc,
   decLabel,
   incLabel,
+  editValue,
+  editLabel,
+  onEditCommit,
+  footer,
 }: {
   label: string;
   value: string;
@@ -698,15 +746,60 @@ function Stepper({
   onInc: () => void;
   decLabel: string;
   incLabel: string;
+  /** When set, the value becomes tappable to type an exact number. */
+  editValue?: number;
+  editLabel?: string;
+  onEditCommit?: (n: number) => void;
+  /** Optional control rendered under the +/- buttons (e.g. a step selector). */
+  footer?: React.ReactNode;
 }) {
+  const editable = onEditCommit != null && editValue != null;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const n = parseFloat(draft.replace(",", "."));
+    if (Number.isFinite(n)) onEditCommit?.(n);
+    setEditing(false);
+  };
+
   return (
     <div className="flex flex-col items-center gap-[7px] rounded-[16px] bg-card px-3 py-3.5">
       <span className="text-[9px] tracking-[0.2em] text-muted-foreground uppercase">
         {label}
       </span>
-      <span className="font-display text-[40px] font-bold leading-none tabular-nums">
-        {value}
-      </span>
+      {editing ? (
+        <input
+          autoFocus
+          type="number"
+          inputMode="decimal"
+          step="any"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            else if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-full bg-transparent text-center font-display text-[40px] font-bold leading-none tabular-nums outline-none"
+        />
+      ) : editable ? (
+        <button
+          type="button"
+          aria-label={editLabel}
+          onClick={() => {
+            setDraft(String(editValue));
+            setEditing(true);
+          }}
+          className="font-display text-[40px] font-bold leading-none tabular-nums"
+        >
+          {value}
+        </button>
+      ) : (
+        <span className="font-display text-[40px] font-bold leading-none tabular-nums">
+          {value}
+        </span>
+      )}
       <div className="flex w-full gap-2">
         <button
           type="button"
@@ -725,6 +818,46 @@ function Stepper({
           <Plus className="size-4" strokeWidth={2.4} />
         </button>
       </div>
+      {footer}
+    </div>
+  );
+}
+
+const WEIGHT_STEPS = [1, 1.25, 2.5, 5] as const;
+
+/** Compact pill row to pick the weight increment for the +/- buttons. */
+function StepSelect({
+  step,
+  onSelect,
+  label,
+  unit,
+}: {
+  step: number;
+  onSelect: (n: number) => void;
+  label: string;
+  unit: string;
+}) {
+  return (
+    <div className="flex w-full items-center justify-center gap-1">
+      <span className="mr-0.5 text-[8px] tracking-[0.16em] text-muted-foreground uppercase">
+        {label}
+      </span>
+      {WEIGHT_STEPS.map((s) => (
+        <button
+          key={s}
+          type="button"
+          aria-label={`${label} ${formatWeight(s)} ${unit}`}
+          aria-pressed={s === step}
+          onClick={() => onSelect(s)}
+          className={`rounded-[7px] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-colors ${
+            s === step
+              ? "bg-primary text-primary-foreground"
+              : "bg-foreground/[0.07] text-muted-foreground active:bg-foreground/[0.16]"
+          }`}
+        >
+          {formatWeight(s)}
+        </button>
+      ))}
     </div>
   );
 }
@@ -757,6 +890,7 @@ function ReceiptScreen({
   weekTotal,
   nextDay,
   onDone,
+  onContinue,
 }: {
   dayName: string;
   weekNumber: number;
@@ -767,6 +901,7 @@ function ReceiptScreen({
   weekTotal: number;
   nextDay: { name: string; weekday: number } | null;
   onDone: () => void;
+  onContinue: () => void;
 }) {
   const t = useT();
   return (
@@ -874,6 +1009,16 @@ function ReceiptScreen({
         >
           <span className="font-display text-[20px] font-semibold tracking-[0.14em] uppercase">
             {t.receipt.done}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="mt-2.5 flex h-[48px] w-full items-center justify-center gap-1.5 rounded-[14px] bg-foreground/[0.08] text-muted-foreground active:bg-foreground/[0.16]"
+        >
+          <ChevronLeft className="size-4" strokeWidth={2.4} />
+          <span className="font-display text-[15px] font-semibold tracking-[0.12em] uppercase">
+            {t.session.continueWorkout}
           </span>
         </button>
         {nextDay && (

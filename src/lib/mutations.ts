@@ -112,6 +112,14 @@ export async function completeSession(sessionId: string) {
     .where(eq(workoutSessions.id, sessionId));
 }
 
+/** Reopen a finished session (clears completedAt) so it resumes as in-progress. */
+export async function reopenSession(sessionId: string) {
+  await db
+    .update(workoutSessions)
+    .set({ completedAt: null })
+    .where(eq(workoutSessions.id, sessionId));
+}
+
 // --- Set logs ---
 
 export type LogSetInput = {
