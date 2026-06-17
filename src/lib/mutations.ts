@@ -159,8 +159,36 @@ export async function updateSet(
   await db.update(setLogs).set(values).where(eq(setLogs.id, id));
 }
 
+/**
+ * Delete a set and renumber the exercise's remaining sets to a dense 1..n
+ * sequence. Without the reindex, deleting a middle set leaves a gap that the
+ * next `logSet` (which numbers by count+1) would collide with, scrambling the
+ * order when the session is reloaded.
+ */
 export async function deleteSet(id: string) {
+  const [row] = await db
+    .select({ sessionId: setLogs.sessionId, exerciseId: setLogs.exerciseId })
+    .from(setLogs)
+    .where(eq(setLogs.id, id));
   await db.delete(setLogs).where(eq(setLogs.id, id));
+  if (!row) return;
+
+  const remaining = await db
+    .select({ id: setLogs.id })
+    .from(setLogs)
+    .where(
+      and(
+        eq(setLogs.sessionId, row.sessionId),
+        eq(setLogs.exerciseId, row.exerciseId)
+      )
+    )
+    .orderBy(asc(setLogs.setNumber), asc(setLogs.createdAt));
+
+  await Promise.all(
+    remaining.map((s, i) =>
+      db.update(setLogs).set({ setNumber: i + 1 }).where(eq(setLogs.id, s.id))
+    )
+  );
 }
 
 // --- Per-exercise notes ---

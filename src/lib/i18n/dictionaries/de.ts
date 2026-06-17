@@ -341,6 +341,15 @@ export const de: Dictionary = {
     continueWorkout: "Training fortsetzen",
     step: "Schritt",
     editWeightLabel: "Gewicht bearbeiten",
+    editSet: "Satz bearbeiten",
+    transition: "Übergang",
+    coachRead: "Coach-Einschätzung",
+    coachReading: "Analysiere deine Zahlen…",
+    coachTarget: "Heutiges Ziel",
+    coachReady: "Bereit",
+    coachHold: "Halten",
+    coachPlateau: "Plateau",
+    coachFirstTime: "Erstes Mal",
   },
 
   receipt: {

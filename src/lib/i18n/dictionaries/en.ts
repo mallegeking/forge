@@ -342,6 +342,15 @@ export const en = {
     continueWorkout: "Continue workout",
     step: "Step",
     editWeightLabel: "Edit weight",
+    editSet: "Edit set",
+    transition: "Transition",
+    coachRead: "Coach's read",
+    coachReading: "Reading your numbers…",
+    coachTarget: "Target today",
+    coachReady: "Ready",
+    coachHold: "Hold",
+    coachPlateau: "Plateau",
+    coachFirstTime: "First time",
   },
 
   receipt: {

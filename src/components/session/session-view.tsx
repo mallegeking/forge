@@ -18,6 +18,9 @@ import {
   Check,
   SkipForward,
   Flame,
+  Trash2,
+  Pencil,
+  Sparkles,
 } from "lucide-react";
 import {
   deloadAdjust,
@@ -33,6 +36,8 @@ import {
 } from "@/lib/format";
 import {
   logSetAction,
+  updateSetAction,
+  deleteSetAction,
   completeSessionAction,
   reopenSessionAction,
   saveNoteAction,
@@ -169,6 +174,9 @@ export function SessionView({
   const [restEnd, setRestEnd] = useState<number | null>(null);
   const [restTotal, setRestTotal] = useState(0);
   const [flashUntil, setFlashUntil] = useState(0);
+  // When set, the rest sheet is a between-exercise transition (not inter-set
+  // rest); holds the next exercise's name for the sheet copy.
+  const [transition, setTransition] = useState<string | null>(null);
 
   // Mirror restEnd into a ref so the single interval can read the latest value
   // without re-subscribing every tick.
@@ -218,6 +226,7 @@ export function SessionView({
       const end = restEndRef.current;
       if (end != null && Date.now() >= end) {
         setRestEnd(null);
+        setTransition(null);
         setFlashUntil(Date.now() + 2400);
         setNow(Date.now());
         beep();
@@ -235,13 +244,29 @@ export function SessionView({
     Object.fromEntries(exercises.map((e) => [e.exerciseId, e.note ?? ""]))
   );
 
+  // Which logged set (if any) is currently open in the inline editor.
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+
+  // Proactive AI coach tip per exercise, keyed by exerciseId. Fetched once when
+  // you land on an exercise and cached (state + sessionStorage) so back-nav and
+  // reloads don't re-bill the model. `tipState` tracks loading vs off (no
+  // provider / error) so the card can fall back to its rule-based line.
+  const [tips, setTips] = useState<Record<string, string>>({});
+  const [tipState, setTipState] = useState<
+    Record<string, "loading" | "done" | "off">
+  >({});
+  const tipLoaded = useRef<Set<string>>(new Set());
+  const tipInFlight = useRef<Set<string>>(new Set());
+
   // --- Mutations ------------------------------------------------------------
   const moveTo = useCallback(
     (i: number) => {
       setExIndex(i);
       setRestEnd(null);
+      setTransition(null);
       setFlashUntil(0);
       setNoteOpen(false);
+      setEditingSetId(null);
       setLogged((prev) => {
         const sd = seedFor(i, prev);
         setWeight(sd.weight);
@@ -290,6 +315,59 @@ export function SessionView({
       );
     });
   }, [cur.length, weight, reps, effSets, ex, exIndex, view.session.id, ensureAudio, startTransition]);
+
+  // Edit a logged set in place (optimistic, then persisted).
+  const commitSetEdit = useCallback(
+    (setId: string, weightKg: number, reps: number) => {
+      setEditingSetId(null);
+      setLogged((prev) =>
+        prev.map((rows, i) =>
+          i === exIndex
+            ? rows.map((s) => (s.id === setId ? { ...s, weightKg, reps } : s))
+            : rows
+        )
+      );
+      startTransition(async () => {
+        await updateSetAction({
+          id: setId,
+          sessionId: view.session.id,
+          weightKg,
+          reps,
+        });
+      });
+    },
+    [exIndex, view.session.id, startTransition]
+  );
+
+  // Delete a logged set (optimistic). The server reindexes the remaining sets.
+  const removeSet = useCallback(
+    (setId: string) => {
+      setEditingSetId(null);
+      setLogged((prev) =>
+        prev.map((rows, i) =>
+          i === exIndex ? rows.filter((s) => s.id !== setId) : rows
+        )
+      );
+      startTransition(async () => {
+        await deleteSetAction({ id: setId, sessionId: view.session.id });
+      });
+    },
+    [exIndex, view.session.id, startTransition]
+  );
+
+  // Advance to the next exercise and start a skippable transition rest using
+  // that exercise's rest time. Only the primary "Next" button calls this —
+  // jumping via the progress bars stays instant.
+  const goNextExercise = useCallback(() => {
+    const next = exercises[exIndex + 1];
+    moveTo(exIndex + 1);
+    if (next) {
+      ensureAudio();
+      setRestTotal(next.defaultRestSeconds);
+      setRestEnd(Date.now() + next.defaultRestSeconds * 1000);
+      setTransition(next.name);
+    }
+  }, [exercises, exIndex, moveTo, ensureAudio]);
 
   const finish = useCallback(() => {
     // Guard against an accidental finish: if any exercise still has sets to log,
@@ -383,6 +461,78 @@ export function SessionView({
     });
   }, [notes, ex, view.session.id, startTransition]);
 
+  // Fetch the per-exercise coach tip when the current exercise changes, with
+  // state + sessionStorage caching so navigating back or reloading is free.
+  const exerciseId = ex.exerciseId;
+  useEffect(() => {
+    const key = `coachtip:${view.session.id}:${exerciseId}`;
+    if (tipLoaded.current.has(exerciseId)) return;
+    const cached =
+      typeof window !== "undefined" ? window.sessionStorage.getItem(key) : null;
+    if (cached != null) {
+      tipLoaded.current.add(exerciseId);
+      setTips((p) => ({ ...p, [exerciseId]: cached }));
+      setTipState((p) => ({ ...p, [exerciseId]: "done" }));
+      return;
+    }
+    if (tipInFlight.current.has(exerciseId)) return;
+    tipInFlight.current.add(exerciseId);
+
+    let aborted = false;
+    const controller = new AbortController();
+    setTipState((p) => ({ ...p, [exerciseId]: "loading" }));
+    (async () => {
+      try {
+        const res = await fetch("/api/coach/tip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: view.session.id, exerciseId }),
+          signal: controller.signal,
+        });
+        // 503 = no provider configured; any non-OK = degrade to rule-based line.
+        if (!res.ok || !res.body) {
+          if (!aborted) {
+            setTipState((p) => ({ ...p, [exerciseId]: "off" }));
+            tipLoaded.current.add(exerciseId);
+          }
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          if (!aborted) setTips((p) => ({ ...p, [exerciseId]: acc }));
+        }
+        acc += decoder.decode();
+        if (!aborted) {
+          const text = acc.trim();
+          setTips((p) => ({ ...p, [exerciseId]: text }));
+          setTipState((p) => ({ ...p, [exerciseId]: text ? "done" : "off" }));
+          tipLoaded.current.add(exerciseId);
+          try {
+            window.sessionStorage.setItem(key, text);
+          } catch {
+            // sessionStorage may be unavailable (private mode) — non-fatal.
+          }
+        }
+      } catch {
+        // Aborted (exercise changed) or network error — leave it unloaded so a
+        // later return can retry; show the rule-based line meanwhile.
+        if (!aborted) setTipState((p) => ({ ...p, [exerciseId]: "off" }));
+      } finally {
+        tipInFlight.current.delete(exerciseId);
+      }
+    })();
+
+    return () => {
+      aborted = true;
+      controller.abort();
+    };
+  }, [exerciseId, view.session.id]);
+
   // --- Receipt screen -------------------------------------------------------
   if (screen === "done" && receipt) {
     return (
@@ -415,12 +565,30 @@ export function SessionView({
   const flashVisible = restEnd == null && flashUntil > now;
   const lastSet = cur[cur.length - 1];
 
+  // Rule-based "coach's read" anchor — instant, and the fallback when the AI
+  // tip is off. (Plateau needs multi-session history, which the AI tip covers.)
+  const anchor = (() => {
+    const last = ex.lastSession;
+    if (!last || last.sets.length === 0) {
+      return { kind: "first" as const, target: null as number | null, inc: 0 };
+    }
+    const lastSets = last.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps }));
+    const top = Math.max(...lastSets.map((s) => s.weightKg));
+    if (!isDeload && isReadyToIncrease(lastSets, rxOf(ex))) {
+      const inc = suggestIncrement(ex.type);
+      return { kind: "ready" as const, target: top + inc.min, inc: inc.min };
+    }
+    return { kind: "hold" as const, target: top, inc: 0 };
+  })();
+  const tip = tips[ex.exerciseId];
+  const tipLoading = tipState[ex.exerciseId] === "loading" && !tip;
+
   const primaryLabel = !targetMet
     ? `${t.session.logSet} ${cur.length + 1}`
     : !isLast
       ? `${t.session.next} · ${exercises[exIndex + 1].name}`
       : t.session.finish;
-  const primaryAction = !targetMet ? logSet : !isLast ? () => moveTo(exIndex + 1) : finish;
+  const primaryAction = !targetMet ? logSet : !isLast ? goNextExercise : finish;
 
   const nextHint = isLast
     ? targetMet
@@ -532,26 +700,73 @@ export function SessionView({
             t.session.firstTime
           )}
         </p>
+
+        {/* Coach's read — instant rule-based verdict + streamed AI tip. */}
+        <div className="mt-3 rounded-[12px] bg-card px-3.5 py-3">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-primary" strokeWidth={2.2} />
+            <span className="font-semibold text-[10px] tracking-[0.2em] text-muted-foreground uppercase">
+              {t.session.coachRead}
+            </span>
+            <span
+              className={`ml-auto font-display text-[12px] font-semibold tracking-[0.08em] uppercase ${
+                anchor.kind === "ready" ? "text-success" : "text-muted-foreground"
+              }`}
+            >
+              {anchor.kind === "ready"
+                ? `${t.session.coachReady} · +${formatWeight(anchor.inc)} ${t.session.kg}`
+                : anchor.kind === "first"
+                  ? t.session.coachFirstTime
+                  : t.session.coachHold}
+            </span>
+          </div>
+          {anchor.target != null && (
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {t.session.coachTarget}:{" "}
+              <span className="text-secondary-foreground">
+                {pre}
+                {formatWeight(anchor.target)} {t.session.kg}
+              </span>
+            </p>
+          )}
+          {tip ? (
+            <p className="mt-1.5 text-[13px] leading-snug text-secondary-foreground">
+              {tip}
+            </p>
+          ) : tipLoading ? (
+            <p className="mt-1.5 animate-pulse text-[12px] text-muted-foreground">
+              {t.session.coachReading}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {/* Logged-set rows (+ optional note) */}
       <div className="mt-3.5 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-[22px] pb-2">
-        {cur.map((s, i) => (
-          <div
-            key={s.id}
-            className="flex items-center gap-3 rounded-[12px] bg-card px-3.5 py-2.5"
-            style={{ animation: `riseIn 0.28s ${EASE} both` }}
-          >
-            <span className="w-[38px] text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-              {t.session.set} {i + 1}
-            </span>
-            <span className="flex-1 font-display text-[19px] font-semibold tracking-[0.04em]">
-              {pre}
-              {formatWeight(s.weightKg)} {t.session.kg.toUpperCase()} × {s.reps}
-            </span>
-            <Check className="size-3.5 text-success" strokeWidth={3} />
-          </div>
-        ))}
+        {cur.map((s, i) =>
+          editingSetId === s.id ? (
+            <SetEditor
+              key={s.id}
+              index={i}
+              set={s}
+              pre={pre}
+              t={t}
+              onSave={(w, r) => commitSetEdit(s.id, w, r)}
+              onCancel={() => setEditingSetId(null)}
+            />
+          ) : (
+            <SwipeableSetRow
+              key={s.id}
+              index={i}
+              set={s}
+              pre={pre}
+              t={t}
+              canModify={!s.id.startsWith("temp-")}
+              onEdit={() => setEditingSetId(s.id)}
+              onDelete={() => removeSet(s.id)}
+            />
+          )
+        )}
         {noteOpen && (
           <textarea
             autoFocus
@@ -651,7 +866,7 @@ export function SessionView({
             <div className="mt-4 flex items-center gap-2">
               <RestIcon />
               <span className="font-semibold text-[11px] tracking-[0.24em] text-muted-foreground uppercase">
-                {t.session.resting}
+                {transition ? t.session.transition : t.session.resting}
               </span>
             </div>
             <div className="mt-1.5 font-display text-[110px] font-bold leading-none tracking-[0.02em] tabular-nums">
@@ -663,7 +878,7 @@ export function SessionView({
                 style={{ width: `${restPct}%`, transition: "width 0.25s linear" }}
               />
             </div>
-            {lastSet && (
+            {!transition && lastSet && (
               <div className="mt-3.5 flex items-center gap-1.5">
                 <Check className="size-[13px] text-success" strokeWidth={3} />
                 <span className="text-[13px] text-secondary-foreground">
@@ -673,8 +888,16 @@ export function SessionView({
               </div>
             )}
             <p className="mt-1.5 text-[12px] tracking-[0.14em] text-muted-foreground uppercase">
-              {t.session.upNext} · {t.session.set} {cur.length + 1} {t.session.of}{" "}
-              {effSets}
+              {transition ? (
+                <>
+                  {t.session.upNext} · {transition}
+                </>
+              ) : (
+                <>
+                  {t.session.upNext} · {t.session.set} {cur.length + 1}{" "}
+                  {t.session.of} {effSets}
+                </>
+              )}
             </p>
             <div className="mt-[18px] grid w-full grid-cols-2 gap-2.5">
               <SheetButton
@@ -686,7 +909,12 @@ export function SessionView({
                 <Plus className="size-3.5" strokeWidth={2.4} />
                 {t.session.sec30.toUpperCase()}
               </SheetButton>
-              <SheetButton onClick={() => setRestEnd(null)}>
+              <SheetButton
+                onClick={() => {
+                  setRestEnd(null);
+                  setTransition(null);
+                }}
+              >
                 <SkipForward className="size-3.5" strokeWidth={2.4} />
                 {t.session.skip.toUpperCase()}
               </SheetButton>
@@ -858,6 +1086,163 @@ function StepSelect({
           {formatWeight(s)}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** A logged-set row: swipe left to reveal Delete, tap to open the editor. */
+function SwipeableSetRow({
+  index,
+  set,
+  pre,
+  t,
+  canModify,
+  onEdit,
+  onDelete,
+}: {
+  index: number;
+  set: LoggedSetRow;
+  pre: string;
+  t: ReturnType<typeof useT>;
+  canModify: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const OPEN = -80;
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef({ startX: 0, baseX: 0, active: false, moved: false });
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!canModify) return;
+    drag.current = { startX: e.clientX, baseX: dx, active: true, moved: false };
+    setDragging(true);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d.active) return;
+    const delta = e.clientX - d.startX;
+    if (Math.abs(delta) > 4) d.moved = true;
+    setDx(Math.max(OPEN, Math.min(0, d.baseX + delta)));
+  };
+  const endDrag = () => {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    setDragging(false);
+    // A tap (no real drag) opens the editor; a completed swipe snaps open/shut.
+    if (!d.moved) {
+      onEdit();
+      setDx(0);
+      return;
+    }
+    setDx(dx < OPEN / 2 ? OPEN : 0);
+  };
+
+  return (
+    <div className="relative" style={{ animation: `riseIn 0.28s ${EASE} both` }}>
+      <button
+        type="button"
+        aria-label={t.session.deleteSet}
+        onClick={onDelete}
+        className="absolute inset-y-0 right-0 flex w-[80px] items-center justify-center rounded-r-[12px] bg-destructive text-white"
+      >
+        <Trash2 className="size-4" strokeWidth={2.2} />
+      </button>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={{
+          transform: `translateX(${dx}px)`,
+          touchAction: "pan-y",
+          transition: dragging ? "none" : "transform 0.2s ease",
+        }}
+        className="relative flex items-center gap-3 rounded-[12px] bg-card px-3.5 py-2.5"
+      >
+        <span className="w-[38px] text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
+          {t.session.set} {index + 1}
+        </span>
+        <span className="flex-1 font-display text-[19px] font-semibold tracking-[0.04em]">
+          {pre}
+          {formatWeight(set.weightKg)} {t.session.kg.toUpperCase()} × {set.reps}
+        </span>
+        <Check className="size-3.5 text-success" strokeWidth={3} />
+      </div>
+    </div>
+  );
+}
+
+/** Inline editor for one logged set — reuses the weight/reps Steppers. */
+function SetEditor({
+  index,
+  set,
+  pre,
+  t,
+  onSave,
+  onCancel,
+}: {
+  index: number;
+  set: LoggedSetRow;
+  pre: string;
+  t: ReturnType<typeof useT>;
+  onSave: (weightKg: number, reps: number) => void;
+  onCancel: () => void;
+}) {
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const [w, setW] = useState(set.weightKg);
+  const [r, setR] = useState(set.reps);
+
+  return (
+    <div
+      className="rounded-[12px] bg-card p-2.5 ring-1 ring-input"
+      style={{ animation: `riseIn 0.2s ${EASE} both` }}
+    >
+      <div className="mb-2 flex items-center gap-1.5 px-1">
+        <Pencil className="size-3 text-muted-foreground" strokeWidth={2.2} />
+        <span className="text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
+          {t.session.editSet} · {t.session.set} {index + 1}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Stepper
+          label={t.session.weightKgLabel}
+          value={`${pre}${formatWeight(w)}`}
+          onDec={() => setW((x) => Math.max(0, round2(x - 2.5)))}
+          onInc={() => setW((x) => round2(x + 2.5))}
+          decLabel={`${t.session.decrease} ${t.session.kg}`}
+          incLabel={`${t.session.increase} ${t.session.kg}`}
+          editValue={w}
+          editLabel={t.session.editWeightLabel}
+          onEditCommit={(n) => setW(Math.max(0, round2(n)))}
+        />
+        <Stepper
+          label={t.session.repsLabel}
+          value={String(r)}
+          onDec={() => setR((x) => Math.max(0, x - 1))}
+          onInc={() => setR((x) => x + 1)}
+          decLabel={`${t.session.decrease} ${t.session.reps}`}
+          incLabel={`${t.session.increase} ${t.session.reps}`}
+        />
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex h-11 items-center justify-center rounded-[11px] bg-foreground/[0.07] font-display text-[15px] font-semibold tracking-[0.1em] uppercase active:bg-foreground/[0.16]"
+        >
+          {t.common.cancel}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave(w, r)}
+          className="flex h-11 items-center justify-center rounded-[11px] bg-primary font-display text-[15px] font-semibold tracking-[0.1em] text-primary-foreground uppercase active:scale-[0.98]"
+        >
+          {t.common.save}
+        </button>
+      </div>
     </div>
   );
 }
