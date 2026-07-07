@@ -47,6 +47,14 @@ export type CoachingSnapshot = {
 // and keeps the prompt (and cost) bounded.
 const MAX_SESSIONS_PER_EXERCISE = 6;
 
+/**
+ * In-band failure marker for the streaming tip endpoint. Once the 200 headers
+ * are out, a mid-stream provider error can only be signalled in the body — the
+ * route appends this NUL character and the session UI treats the whole tip as
+ * failed (shows a localized error + retry instead of caching the partial text).
+ */
+export const TIP_STREAM_ERROR_SENTINEL = "\u0000";
+
 export const COACH_SYSTEM_PROMPT = `You are Forge, the strength coach built into the athlete's training app. You speak directly to the athlete who logs their lifts here.
 
 The app follows one progression rule, and so do you:

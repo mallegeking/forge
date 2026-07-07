@@ -8,6 +8,7 @@ import {
   detectPlateau,
   computeTrainingWeek,
   isDeloadWeek,
+  resolveDeload,
   deloadAdjust,
   type LoggedSet,
   type RepRange,
@@ -99,20 +100,37 @@ describe("detectPlateau", () => {
 });
 
 describe("training week + deload cadence", () => {
-  const start = new Date(2026, 0, 1); // Jan 1 2026
-  it("week 1 on the start day and within 6 days", () => {
-    expect(computeTrainingWeek(start, new Date(2026, 0, 1))).toBe(1);
-    expect(computeTrainingWeek(start, new Date(2026, 0, 7))).toBe(1);
+  // Weeks are Monday-aligned: they follow the program's calendar layout, not
+  // the start date's own weekday. Jan 5 2026 is a Monday.
+  const monday = new Date(2026, 0, 5);
+  it("week 1 spans the start's Monday through Sunday", () => {
+    expect(computeTrainingWeek(monday, new Date(2026, 0, 5))).toBe(1);
+    expect(computeTrainingWeek(monday, new Date(2026, 0, 11))).toBe(1); // Sun
   });
-  it("rolls to week 2 after 7 days", () => {
-    expect(computeTrainingWeek(start, new Date(2026, 0, 8))).toBe(2);
+  it("rolls to week 2 on the next Monday", () => {
+    expect(computeTrainingWeek(monday, new Date(2026, 0, 12))).toBe(2);
+  });
+  it("snaps a mid-week start back to its Monday", () => {
+    const friday = new Date(2026, 0, 9); // same week as Jan 5
+    // Friday and Saturday of the start week are still week 1…
+    expect(computeTrainingWeek(friday, new Date(2026, 0, 9))).toBe(1);
+    expect(computeTrainingWeek(friday, new Date(2026, 0, 10))).toBe(1);
+    // …and the following Monday is week 2, NOT day 3 of week 1. This is what
+    // keeps a deload week from straddling two program weeks.
+    expect(computeTrainingWeek(friday, new Date(2026, 0, 12))).toBe(2);
   });
   it("week 4 and 8 are deload weeks", () => {
-    expect(computeTrainingWeek(start, new Date(2026, 0, 22))).toBe(4);
+    expect(computeTrainingWeek(monday, new Date(2026, 0, 26))).toBe(4);
     expect(isDeloadWeek(4)).toBe(true);
     expect(isDeloadWeek(8)).toBe(true);
     expect(isDeloadWeek(1)).toBe(false);
     expect(isDeloadWeek(0)).toBe(false);
+  });
+  it("resolveDeload honors a skipped week, then resumes cadence", () => {
+    expect(resolveDeload(4, null)).toBe(true);
+    expect(resolveDeload(4, "4")).toBe(false); // skipped this one
+    expect(resolveDeload(5, "4")).toBe(false);
+    expect(resolveDeload(8, "4")).toBe(true); // cadence resumes
   });
 });
 

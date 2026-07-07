@@ -8,10 +8,11 @@ import {
   getHomeLedger,
   getCompletedDayIdsThisWeek,
   getBodyweightEntries,
+  hasDeloadSessionThisWeek,
   isoWeekday,
 } from "@/lib/queries";
 import { getSetting } from "@/lib/mutations";
-import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
+import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
 import { buildCoachNote } from "@/lib/coach";
 import { weeklyAverages } from "@/lib/bodyweight";
 import { getNutritionConfig } from "@/lib/nutrition-config";
@@ -77,6 +78,7 @@ export default async function Home() {
     completedDayIds,
     bwEntries,
     nutrition,
+    deloadStarted,
   ] = await Promise.all([
     getProgramDays(program.id),
     getProgramDayCounts(program.id),
@@ -87,6 +89,7 @@ export default async function Home() {
     getCompletedDayIdsThisWeek(program.id),
     getBodyweightEntries(),
     getNutritionConfig(),
+    hasDeloadSessionThisWeek(program.id),
   ]);
 
   const today = isoWeekday();
@@ -125,8 +128,7 @@ export default async function Home() {
   const week = startIso
     ? computeTrainingWeek(new Date(startIso), new Date())
     : null;
-  const deload =
-    week != null && isDeloadWeek(week) && postponedWeek !== String(week);
+  const deload = week != null && resolveDeload(week, postponedWeek);
   const completedToday = todayDay ? completedDayIds.has(todayDay.id) : false;
   const weekDoneCount = completedDayIds.size;
 
@@ -214,14 +216,19 @@ export default async function Home() {
               <Moon className="size-3.5 shrink-0" />
               {t.home.deloadNotice}
             </span>
-            <form action={postponeDeloadAction}>
-              <button
-                type="submit"
-                className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-              >
-                {t.home.postpone}
-              </button>
-            </form>
+            {/* Skipping is all-or-nothing: once a deload session exists this
+                week, hide the button — a mid-week skip would leave the split
+                half-deloaded (some days light, the others never deloaded). */}
+            {!deloadStarted && (
+              <form action={postponeDeloadAction}>
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                >
+                  {t.home.postpone}
+                </button>
+              </form>
+            )}
           </div>
         )}
 

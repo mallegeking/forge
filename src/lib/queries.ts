@@ -12,7 +12,7 @@ import {
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
-import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
+import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
 import { getSetting } from "@/lib/mutations";
 import type {
   CoachingSnapshot,
@@ -112,6 +112,10 @@ export type LoggedSetRow = {
 /**
  * The sets from the most recent OTHER session that included this exercise —
  * i.e. "what you did last time", shown when you open the exercise.
+ *
+ * Deload sessions are excluded: "last time" seeds the steppers and the coach's
+ * target, and comparing against a ~60% deload session would drag every lift's
+ * target down for the whole week after a deload.
  */
 export async function getLastSessionSetsForExercise(
   exerciseId: string,
@@ -129,7 +133,11 @@ export async function getLastSessionSetsForExercise(
     .from(setLogs)
     .innerJoin(workoutSessions, eq(setLogs.sessionId, workoutSessions.id))
     .where(
-      and(eq(setLogs.exerciseId, exerciseId), ne(setLogs.sessionId, currentSessionId))
+      and(
+        eq(setLogs.exerciseId, exerciseId),
+        ne(setLogs.sessionId, currentSessionId),
+        eq(workoutSessions.isDeload, false)
+      )
     )
     .orderBy(desc(workoutSessions.performedAt), asc(setLogs.setNumber));
 
@@ -241,6 +249,12 @@ export type ExerciseHistoryPoint = {
   totalSets: number;
   /** Whether every working set reached the top of the rep range that session. */
   hitTopOfRange: boolean;
+  /**
+   * Deload sessions stay in the history (they happened) but are flagged so
+   * progression consumers — plateau detection, the live coach tip — can skip
+   * them instead of reading a planned ~60% week as a regression.
+   */
+  isDeload: boolean;
 };
 
 export async function getExerciseHistory(exerciseId: string) {
@@ -265,6 +279,7 @@ export async function getExerciseHistory(exerciseId: string) {
     .select({
       sessionId: setLogs.sessionId,
       performedAt: workoutSessions.performedAt,
+      isDeload: workoutSessions.isDeload,
       weightKg: setLogs.weightKg,
       reps: setLogs.reps,
     })
@@ -278,6 +293,7 @@ export async function getExerciseHistory(exerciseId: string) {
   type Acc = {
     sessionId: string;
     performedAt: Date;
+    isDeload: boolean;
     topWeightKg: number;
     topReps: number;
     totalSets: number;
@@ -290,6 +306,7 @@ export async function getExerciseHistory(exerciseId: string) {
       bySession.set(r.sessionId, {
         sessionId: r.sessionId,
         performedAt: r.performedAt,
+        isDeload: r.isDeload,
         topWeightKg: r.weightKg,
         topReps: r.reps,
         totalSets: 1,
@@ -309,6 +326,7 @@ export async function getExerciseHistory(exerciseId: string) {
     (a) => ({
       sessionId: a.sessionId,
       performedAt: a.performedAt,
+      isDeload: a.isDeload,
       topWeightKg: a.topWeightKg,
       topReps: a.topReps,
       totalSets: a.totalSets,
@@ -331,8 +349,12 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
   const program = await getActiveProgram();
   if (!program) return null;
 
-  // Same week/deload inputs the home page uses.
-  const startIso = await getSetting("trainingStartDate");
+  // Same week/deload inputs the home page uses — including the postponed
+  // deload, so the coach never briefs a deload the athlete has skipped.
+  const [startIso, postponedWeek] = await Promise.all([
+    getSetting("trainingStartDate"),
+    getSetting("deloadPostponedWeek"),
+  ]);
   const weekNumber = startIso
     ? computeTrainingWeek(new Date(startIso), new Date())
     : 1;
@@ -364,6 +386,10 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
 
   // Every logged set in this program, newest session first. One pass groups
   // rows into per-exercise, per-session buckets while preserving that order.
+  // Deload sessions are excluded: the progression flags (READY / PLATEAU) and
+  // the model's read of the trend must compare normal working sessions — a
+  // ~60% deload week would otherwise register as a regression and reset the
+  // plateau streak.
   const logRows = await db
     .select({
       exerciseId: setLogs.exerciseId,
@@ -374,7 +400,12 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
     })
     .from(setLogs)
     .innerJoin(workoutSessions, eq(setLogs.sessionId, workoutSessions.id))
-    .where(eq(workoutSessions.programId, program.id))
+    .where(
+      and(
+        eq(workoutSessions.programId, program.id),
+        eq(workoutSessions.isDeload, false)
+      )
+    )
     .orderBy(desc(workoutSessions.performedAt), asc(setLogs.setNumber));
 
   const sessionsByExercise = new Map<string, SnapshotSession[]>();
@@ -410,7 +441,7 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
   return {
     programName: program.name,
     weekNumber,
-    isDeload: isDeloadWeek(weekNumber),
+    isDeload: resolveDeload(weekNumber, postponedWeek),
     exercises: exerciseSnapshots,
   };
 }
@@ -612,6 +643,29 @@ export async function getCompletedDayIdsThisWeek(
       )
     );
   return new Set(rows.map((r) => r.dayId));
+}
+
+/**
+ * Whether any deload session was already started this calendar week. Once the
+ * deload is underway, the home banner hides its skip button — skipping
+ * mid-deload is what leaves the week half-deloaded (some days light, the rest
+ * never deloaded).
+ */
+export async function hasDeloadSessionThisWeek(
+  programId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: workoutSessions.id })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.programId, programId),
+        eq(workoutSessions.isDeload, true),
+        gte(workoutSessions.performedAt, startOfWeek(new Date()))
+      )
+    )
+    .limit(1);
+  return row != null;
 }
 
 /** One photo's metadata — for serving its bytes with the right content type. */

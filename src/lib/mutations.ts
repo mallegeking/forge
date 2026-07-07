@@ -14,7 +14,7 @@ import {
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNull, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { computeTrainingWeek, isDeloadWeek } from "@/lib/progression";
+import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
 
 // --- Settings (key/value app state) ---
 
@@ -74,7 +74,7 @@ export async function startOrResumeSession(dayId: string): Promise<string> {
 
   // Deload every 4th week, unless the athlete postponed this week's deload.
   const postponed = await getSetting("deloadPostponedWeek");
-  const isDeload = isDeloadWeek(weekNumber) && postponed !== String(weekNumber);
+  const isDeload = resolveDeload(weekNumber, postponed);
 
   const id = nanoid();
   await db.insert(workoutSessions).values({

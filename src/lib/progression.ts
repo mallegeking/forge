@@ -110,12 +110,38 @@ export function detectPlateau(
   };
 }
 
-/** 1-based training week number, counted from the first logged session. */
+/**
+ * 1-based training week number, counted from the first logged session — but
+ * aligned to Monday-based calendar weeks, matching how the program lays out
+ * its days (dayOfWeek 1–7) and how the home rail counts "this week".
+ *
+ * The old behavior anchored weeks to the start date's own weekday, so an
+ * athlete who first trained on a Friday got Fri→Thu "weeks". A deload week
+ * then straddled two program weeks: it deloaded the tail of one (Fri/Sat) and
+ * the head of the next (Mon–Thu), skipping days and double-deloading exercises
+ * shared across the boundary. Snapping the start to its Monday makes training
+ * week === program week, so a deload covers each program day exactly once.
+ */
 export function computeTrainingWeek(startDate: Date, now: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
-  const days = Math.floor((startOfDay(now) - startOfDay(startDate)) / msPerDay);
+  const days = Math.floor(
+    (startOfDay(now) - startOfMonday(startDate)) / msPerDay
+  );
   if (days < 0) return 1;
   return Math.floor(days / 7) + 1;
+}
+
+/**
+ * Whether the current week is a deload, honoring a postponed ("skipped")
+ * deload: the setting records the week the athlete opted out of, and cadence
+ * resumes on the next multiple of 4. Shared by the home banner, session
+ * creation, and the coach snapshot so all three always agree.
+ */
+export function resolveDeload(
+  week: number,
+  postponedWeek: string | null
+): boolean {
+  return isDeloadWeek(week) && postponedWeek !== String(week);
 }
 
 /** Deload cadence: every 4th training week. */
@@ -146,4 +172,11 @@ export function deloadAdjust(rx: RepRange): DeloadTarget {
 
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** Midnight of the Monday of `d`'s ISO week. */
+function startOfMonday(d: Date): number {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return date.getTime();
 }

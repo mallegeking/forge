@@ -28,6 +28,7 @@ import {
   suggestIncrement,
   type RepRange,
 } from "@/lib/progression";
+import { TIP_STREAM_ERROR_SENTINEL } from "@/lib/coach";
 import {
   formatWeight,
   formatSet,
@@ -250,11 +251,14 @@ export function SessionView({
   // Proactive AI coach tip per exercise, keyed by exerciseId. Fetched once when
   // you land on an exercise and cached (state + sessionStorage) so back-nav and
   // reloads don't re-bill the model. `tipState` tracks loading vs off (no
-  // provider / error) so the card can fall back to its rule-based line.
+  // provider) vs error (transient failure — retryable, never cached) so the
+  // card can fall back to its rule-based line.
   const [tips, setTips] = useState<Record<string, string>>({});
   const [tipState, setTipState] = useState<
-    Record<string, "loading" | "done" | "off">
+    Record<string, "loading" | "done" | "off" | "error">
   >({});
+  // Bumping this refetches the current exercise's tip (the "Retry" button).
+  const [tipNonce, setTipNonce] = useState(0);
   const tipLoaded = useRef<Set<string>>(new Set());
   const tipInFlight = useRef<Set<string>>(new Set());
 
@@ -489,11 +493,13 @@ export function SessionView({
           body: JSON.stringify({ sessionId: view.session.id, exerciseId }),
           signal: controller.signal,
         });
-        // 503 = no provider configured; any non-OK = degrade to rule-based line.
+        // 503 = no provider configured — permanently off, rule-based line only.
+        // Any other non-OK is transient (server hiccup) — offer a retry.
         if (!res.ok || !res.body) {
           if (!aborted) {
-            setTipState((p) => ({ ...p, [exerciseId]: "off" }));
-            tipLoaded.current.add(exerciseId);
+            const off = res.status === 503;
+            setTipState((p) => ({ ...p, [exerciseId]: off ? "off" : "error" }));
+            if (off) tipLoaded.current.add(exerciseId);
           }
           return;
         }
@@ -504,10 +510,21 @@ export function SessionView({
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
-          if (!aborted) setTips((p) => ({ ...p, [exerciseId]: acc }));
+          if (!aborted && !acc.includes(TIP_STREAM_ERROR_SENTINEL)) {
+            setTips((p) => ({ ...p, [exerciseId]: acc }));
+          }
         }
         acc += decoder.decode();
         if (!aborted) {
+          // The route signals mid-stream provider failures with an in-band
+          // sentinel (headers were already 200). Discard the partial tip and
+          // surface a retry — caching it would pin the failure for the whole
+          // session (the old bug: an error note stuck until the tab died).
+          if (acc.includes(TIP_STREAM_ERROR_SENTINEL)) {
+            setTips((p) => ({ ...p, [exerciseId]: "" }));
+            setTipState((p) => ({ ...p, [exerciseId]: "error" }));
+            return;
+          }
           const text = acc.trim();
           setTips((p) => ({ ...p, [exerciseId]: text }));
           setTipState((p) => ({ ...p, [exerciseId]: text ? "done" : "off" }));
@@ -519,9 +536,9 @@ export function SessionView({
           }
         }
       } catch {
-        // Aborted (exercise changed) or network error — leave it unloaded so a
-        // later return can retry; show the rule-based line meanwhile.
-        if (!aborted) setTipState((p) => ({ ...p, [exerciseId]: "off" }));
+        // Aborted (exercise changed) or network error — show a retry so the
+        // athlete can refetch without leaving the exercise.
+        if (!aborted) setTipState((p) => ({ ...p, [exerciseId]: "error" }));
       } finally {
         tipInFlight.current.delete(exerciseId);
       }
@@ -531,6 +548,20 @@ export function SessionView({
       aborted = true;
       controller.abort();
     };
+  }, [exerciseId, view.session.id, tipNonce]);
+
+  // Retry a failed tip fetch: clear every cache layer for this exercise and
+  // re-run the effect above.
+  const retryTip = useCallback(() => {
+    try {
+      window.sessionStorage.removeItem(`coachtip:${view.session.id}:${exerciseId}`);
+    } catch {
+      // non-fatal
+    }
+    tipLoaded.current.delete(exerciseId);
+    setTips((p) => ({ ...p, [exerciseId]: "" }));
+    setTipState((p) => ({ ...p, [exerciseId]: "loading" }));
+    setTipNonce((n) => n + 1);
   }, [exerciseId, view.session.id]);
 
   // --- Receipt screen -------------------------------------------------------
@@ -574,7 +605,15 @@ export function SessionView({
     }
     const lastSets = last.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps }));
     const top = Math.max(...lastSets.map((s) => s.weightKg));
-    if (!isDeload && isReadyToIncrease(lastSets, rxOf(ex))) {
+    if (isDeload) {
+      // Deload target ≈ 60% of the last normal top set, rounded like the
+      // stepper seed — the card must not prescribe full working weight on a
+      // recovery day.
+      const factor = deloadAdjust(rxOf(ex)).loadFactor;
+      const target = Math.max(0, Math.round((top * factor) / 2.5) * 2.5);
+      return { kind: "hold" as const, target, inc: 0 };
+    }
+    if (isReadyToIncrease(lastSets, rxOf(ex))) {
       const inc = suggestIncrement(ex.type);
       return { kind: "ready" as const, target: top + inc.min, inc: inc.min };
     }
@@ -582,6 +621,7 @@ export function SessionView({
   })();
   const tip = tips[ex.exerciseId];
   const tipLoading = tipState[ex.exerciseId] === "loading" && !tip;
+  const tipError = tipState[ex.exerciseId] === "error";
 
   const primaryLabel = !targetMet
     ? `${t.session.logSet} ${cur.length + 1}`
@@ -737,6 +777,19 @@ export function SessionView({
             <p className="mt-1.5 animate-pulse text-[12px] text-muted-foreground">
               {t.session.coachReading}
             </p>
+          ) : tipError ? (
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <p className="text-[12px] text-muted-foreground">
+                ⚠️ {t.session.coachTipError}
+              </p>
+              <button
+                type="button"
+                onClick={retryTip}
+                className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-primary hover:bg-primary/10"
+              >
+                {t.common.retryAction}
+              </button>
+            </div>
           ) : null}
         </div>
       </div>

@@ -27,10 +27,13 @@ export default async function ExercisePage({
     value: p.topWeightKg,
   }));
 
-  // Plateau detection runs over most-recent-first session summaries.
+  // Plateau detection runs over most-recent-first session summaries. Deload
+  // sessions are skipped — their planned lighter weight would otherwise break
+  // the "stuck at the same load" streak and mask a real stall.
   const plateau = detectPlateau(
     [...points]
       .reverse()
+      .filter((p) => !p.isDeload)
       .map((p) => ({ weightKg: p.topWeightKg, hitTopOfRange: p.hitTopOfRange }))
   );
   const stuckWeight = plateau.weightKg ?? 0;
@@ -135,6 +138,9 @@ export default async function ExercisePage({
                   {" "}
                   · {p.totalSets}{" "}
                   {p.totalSets === 1 ? t.exercise.setSingular : t.exercise.setPlural}
+                  {p.isDeload && (
+                    <span className="uppercase"> · {t.session.deload}</span>
+                  )}
                 </span>
               </span>
             </li>

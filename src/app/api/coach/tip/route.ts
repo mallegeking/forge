@@ -9,12 +9,13 @@
 import { getSessionView, getExerciseHistory } from "@/lib/queries";
 import {
   COACH_TIP_SYSTEM_PROMPT,
+  TIP_STREAM_ERROR_SENTINEL,
   buildExerciseTipBrief,
   type ExerciseTipSession,
 } from "@/lib/coach";
 import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach } from "@/lib/coach-stream";
-import { getLocale, getDict } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/i18n/server";
 import { LANGUAGE_DIRECTIVE } from "@/lib/i18n/config";
 
 // Reads the DB + env per request; never prerender.
@@ -37,11 +38,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
 
-  const [view, history, locale, t] = await Promise.all([
+  const [view, history, locale] = await Promise.all([
     getSessionView(sessionId),
     getExerciseHistory(exerciseId),
     getLocale(),
-    getDict(),
   ]);
 
   const ex = view?.exercises.find((e) => e.exerciseId === exerciseId);
@@ -49,9 +49,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Prior sessions of this exercise (exclude the current one), most-recent first.
+  // Prior sessions of this exercise (exclude the current one), most-recent
+  // first. Deload sessions are skipped — the tip's READY/PLATEAU status must
+  // read normal working sessions, not a planned ~60% recovery week.
   const recent: ExerciseTipSession[] = (history?.points ?? [])
-    .filter((p) => p.sessionId !== sessionId)
+    .filter((p) => p.sessionId !== sessionId && !p.isDeload)
     .sort((a, b) => b.performedAt.getTime() - a.performedAt.getTime())
     .map((p) => ({
       performedAt: p.performedAt,
@@ -85,9 +87,11 @@ export async function POST(request: Request) {
         }
         controller.close();
       } catch (err) {
-        // 200 headers are already sent — surface a readable note in-stream.
+        // 200 headers are already sent, so signal the failure in-band with a
+        // NUL sentinel — the session UI discards the partial tip, shows its own
+        // localized error line, and offers a retry (it must NOT cache this).
         console.error("[coach/tip] stream error", err);
-        controller.enqueue(encoder.encode(t.common.aiStreamError));
+        controller.enqueue(encoder.encode(TIP_STREAM_ERROR_SENTINEL));
         controller.close();
       }
     },
