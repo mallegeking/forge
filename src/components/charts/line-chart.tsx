@@ -7,9 +7,12 @@ type Point = { label: string; value: number };
 export function LineChart({
   data,
   ariaLabel = "Top set weight over time",
+  formatValue = formatWeight,
 }: {
   data: Point[];
   ariaLabel?: string;
+  /** Formats the y-axis min/max labels. Defaults to weight (kg). */
+  formatValue?: (value: number) => string;
 }) {
   if (data.length === 0) {
     return (
@@ -67,7 +70,7 @@ export function LineChart({
               className="fill-muted-foreground"
               fontSize={9}
             >
-              {formatWeight(v)}
+              {formatValue(v)}
             </text>
           </g>
         ))}

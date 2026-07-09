@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Check,
   Moon,
+  BarChart3,
 } from "lucide-react";
 
 // Reads the database and resolves "today" — must render per request, never
@@ -168,6 +169,13 @@ export default async function Home() {
           </span>
         </div>
         <div className="flex items-center gap-3.5 text-muted-foreground">
+          <Link
+            href="/statistics"
+            aria-label={t.home.statistics}
+            className="transition-colors hover:text-foreground"
+          >
+            <BarChart3 className="size-[17px]" />
+          </Link>
           <Link
             href="/settings"
             aria-label={t.home.settings}

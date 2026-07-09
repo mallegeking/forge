@@ -62,6 +62,7 @@ export const de: Dictionary = {
     noProgramAfter: "aus, um deinen 5-Tage-Split zu laden.",
     lockApp: "App sperren",
     settings: "Einstellungen",
+    statistics: "Statistiken",
     today: "Heute",
     week: "Woche",
     deloadNotice: "Deload-Woche — leichtere Gewichte, weniger Sätze.",
@@ -398,5 +399,19 @@ export const de: Dictionary = {
     noSessions: "Noch keine Einheiten erfasst.",
     setSingular: "Satz",
     setPlural: "Sätze",
+  },
+
+  statistics: {
+    title: "Statistiken",
+    subtitle: "Dein Training über die Zeit",
+    totalWorkouts: "Einheiten",
+    streak: "Wochen-Streak",
+    avgPerWeek: "Ø / Woche",
+    volume: "Volumen über die Zeit",
+    sessionsPerWeek: "Einheiten pro Woche",
+    prs: "Persönliche Rekorde",
+    noPrs: "Noch keine PRs — logg weiter.",
+    e1rm: "Geschätztes 1RM",
+    noData: "Noch keine Einheiten erfasst.",
   },
 };

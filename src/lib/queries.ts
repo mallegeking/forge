@@ -19,6 +19,7 @@ import type {
   ExerciseSnapshot,
   SnapshotSession,
 } from "@/lib/coach";
+import type { StatsRow } from "@/lib/stats";
 
 /** ISO weekday for a date: 1 = Monday ... 7 = Sunday. */
 export function isoWeekday(date = new Date()): number {
@@ -337,6 +338,34 @@ export async function getExerciseHistory(exerciseId: string) {
   );
 
   return { exercise, targetRange: rx ?? null, points };
+}
+
+/**
+ * Every logged set of the program's completed sessions, joined to its session
+ * date and exercise name/type — the flat feed the statistics page aggregates in
+ * TypeScript (see `@/lib/stats`). Ordered oldest-first.
+ */
+export async function getStatsRows(programId: string): Promise<StatsRow[]> {
+  return db
+    .select({
+      sessionId: setLogs.sessionId,
+      performedAt: workoutSessions.performedAt,
+      exerciseId: setLogs.exerciseId,
+      exerciseName: exercises.name,
+      exerciseType: exercises.type,
+      weightKg: setLogs.weightKg,
+      reps: setLogs.reps,
+    })
+    .from(setLogs)
+    .innerJoin(workoutSessions, eq(setLogs.sessionId, workoutSessions.id))
+    .innerJoin(exercises, eq(setLogs.exerciseId, exercises.id))
+    .where(
+      and(
+        eq(workoutSessions.programId, programId),
+        isNotNull(workoutSessions.completedAt)
+      )
+    )
+    .orderBy(asc(workoutSessions.performedAt));
 }
 
 /**

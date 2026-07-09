@@ -64,6 +64,7 @@ export const en = {
     noProgramAfter: "to load your 5-day split.",
     lockApp: "Lock app",
     settings: "Settings",
+    statistics: "Statistics",
     today: "Today",
     week: "Week",
     deloadNotice: "Deload week — lighter loads, fewer sets.",
@@ -399,6 +400,20 @@ export const en = {
     noSessions: "No sessions logged yet.",
     setSingular: "set",
     setPlural: "sets",
+  },
+
+  statistics: {
+    title: "Statistics",
+    subtitle: "Your training over time",
+    totalWorkouts: "Workouts",
+    streak: "Week streak",
+    avgPerWeek: "Avg / week",
+    volume: "Volume over time",
+    sessionsPerWeek: "Sessions per week",
+    prs: "Personal records",
+    noPrs: "No PRs yet — keep logging.",
+    e1rm: "Estimated 1RM",
+    noData: "No sessions logged yet.",
   },
 };
 
