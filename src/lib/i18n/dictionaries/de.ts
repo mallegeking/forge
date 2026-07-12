@@ -411,7 +411,11 @@ export const de: Dictionary = {
     sessionsPerWeek: "Einheiten pro Woche",
     prs: "Persönliche Rekorde",
     noPrs: "Noch keine PRs — logg weiter.",
+    showAll: "Alle {n} anzeigen",
+    showLess: "Weniger anzeigen",
+    thisWeek: "Diese Woche",
     e1rm: "Geschätztes 1RM",
+    currentE1rm: "Aktuelle Schätzung",
     noData: "Noch keine Einheiten erfasst.",
   },
 };

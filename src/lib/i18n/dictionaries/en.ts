@@ -412,7 +412,11 @@ export const en = {
     sessionsPerWeek: "Sessions per week",
     prs: "Personal records",
     noPrs: "No PRs yet — keep logging.",
+    showAll: "Show all {n}",
+    showLess: "Show less",
+    thisWeek: "This week",
     e1rm: "Estimated 1RM",
+    currentE1rm: "Current estimate",
     noData: "No sessions logged yet.",
   },
 };

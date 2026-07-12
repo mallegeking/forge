@@ -14,6 +14,8 @@ export type StatsRow = {
   exerciseId: string;
   exerciseName: string;
   exerciseType: ExerciseType;
+  /** Weight is added load on top of bodyweight (dips, pull-ups, …). */
+  isBodyweightPlus?: boolean;
   weightKg: number;
   reps: number;
 };
@@ -105,11 +107,23 @@ export function consistency(rows: StatsRow[], now = new Date()): ConsistencyStat
     else byWeek.set(key, { weekStart, count: 1 });
   }
 
-  const weeklyCounts = Array.from(byWeek.values()).sort(
-    (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
-  );
-
   const thisWeekStart = weekStartOf(now);
+
+  // Dense week series, first training week → current week (or the last logged
+  // week if `now` predates it): skipped weeks appear as explicit zero counts so
+  // the bar chart keeps a uniform time axis instead of silently omitting gaps.
+  const weeklyCounts: { weekStart: Date; count: number }[] = [];
+  if (byWeek.size > 0) {
+    const sorted = Array.from(byWeek.values()).sort(
+      (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
+    );
+    const end = new Date(
+      Math.max(thisWeekStart.getTime(), sorted[sorted.length - 1].weekStart.getTime())
+    );
+    for (let w = sorted[0].weekStart; w <= end; w = addWeeks(w, 1)) {
+      weeklyCounts.push({ weekStart: w, count: byWeek.get(w.getTime())?.count ?? 0 });
+    }
+  }
   const thisWeek = byWeek.get(thisWeekStart.getTime())?.count ?? 0;
 
   // Streak: consecutive weeks with ≥1 session ending at the current week. An
@@ -143,17 +157,21 @@ export type PrEvent = {
   reps: number;
 };
 
-/**
- * Chronological (oldest-first) log of weight PRs: each time a session's top set
- * for an exercise beats that exercise's best in any earlier session. The very
- * first time an exercise is logged is not a PR (mirrors getHomeLedger).
- */
-export function prTimeline(rows: StatsRow[]): PrEvent[] {
-  // Group into sessions, tracking each exercise's top set (heaviest; ties → more reps).
-  type Best = { name: string; weightKg: number; reps: number };
+/** A session's top set for one exercise (heaviest; ties → more reps). */
+type TopSet = {
+  name: string;
+  weightKg: number;
+  reps: number;
+  isBodyweightPlus: boolean;
+};
+
+/** Sessions oldest-first, each with its top set per exercise. */
+function topSetsBySession(
+  rows: StatsRow[]
+): { performedAt: Date; best: Map<string, TopSet> }[] {
   const bySession = new Map<
     string,
-    { performedAt: Date; best: Map<string, Best> }
+    { performedAt: Date; best: Map<string, TopSet> }
   >();
   for (const r of rows) {
     let s = bySession.get(r.sessionId);
@@ -171,17 +189,24 @@ export function prTimeline(rows: StatsRow[]): PrEvent[] {
         name: r.exerciseName,
         weightKg: r.weightKg,
         reps: r.reps,
+        isBodyweightPlus: r.isBodyweightPlus ?? false,
       });
     }
   }
-
-  const sessions = Array.from(bySession.entries()).sort(
-    (a, b) => a[1].performedAt.getTime() - b[1].performedAt.getTime()
+  return Array.from(bySession.values()).sort(
+    (a, b) => a.performedAt.getTime() - b.performedAt.getTime()
   );
+}
 
+/**
+ * Chronological (oldest-first) log of weight PRs: each time a session's top set
+ * for an exercise beats that exercise's best in any earlier session. The very
+ * first time an exercise is logged is not a PR (mirrors getHomeLedger).
+ */
+export function prTimeline(rows: StatsRow[]): PrEvent[] {
   const bestPrior = new Map<string, number>();
   const events: PrEvent[] = [];
-  for (const [, session] of sessions) {
+  for (const session of topSetsBySession(rows)) {
     for (const [exerciseId, top] of session.best) {
       const prior = bestPrior.get(exerciseId);
       if (prior != null && top.weightKg > prior) {
@@ -198,6 +223,63 @@ export function prTimeline(rows: StatsRow[]): PrEvent[] {
     }
   }
   return events;
+}
+
+// ---------------------------------------------------------------------------
+// All-time best per exercise
+// ---------------------------------------------------------------------------
+
+export type ExerciseBest = {
+  exerciseId: string;
+  exerciseName: string;
+  isBodyweightPlus: boolean;
+  weightKg: number;
+  reps: number;
+  /** Date of the session in which this best was achieved. */
+  performedAt: Date;
+  /** Weight PRs along the way (same rule as prTimeline: first log ≠ PR). */
+  prCount: number;
+};
+
+/**
+ * One entry per exercise: its all-time best top set (heaviest; ties → more
+ * reps) and when it happened. Freshest bests first — the deduplicated view the
+ * stats page renders instead of the raw PR event stream.
+ */
+export function exerciseBests(rows: StatsRow[]): ExerciseBest[] {
+  const best = new Map<string, ExerciseBest>();
+  for (const session of topSetsBySession(rows)) {
+    for (const [exerciseId, top] of session.best) {
+      const cur = best.get(exerciseId);
+      if (!cur) {
+        best.set(exerciseId, {
+          exerciseId,
+          exerciseName: top.name,
+          isBodyweightPlus: top.isBodyweightPlus,
+          weightKg: top.weightKg,
+          reps: top.reps,
+          performedAt: session.performedAt,
+          prCount: 0,
+        });
+      } else if (
+        top.weightKg > cur.weightKg ||
+        (top.weightKg === cur.weightKg && top.reps > cur.reps)
+      ) {
+        best.set(exerciseId, {
+          ...cur,
+          weightKg: top.weightKg,
+          reps: top.reps,
+          performedAt: session.performedAt,
+          prCount: cur.prCount + (top.weightKg > cur.weightKg ? 1 : 0),
+        });
+      }
+    }
+  }
+  return Array.from(best.values()).sort(
+    (a, b) =>
+      b.performedAt.getTime() - a.performedAt.getTime() ||
+      a.exerciseName.localeCompare(b.exerciseName)
+  );
 }
 
 // ---------------------------------------------------------------------------

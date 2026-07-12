@@ -353,6 +353,7 @@ export async function getStatsRows(programId: string): Promise<StatsRow[]> {
       exerciseId: setLogs.exerciseId,
       exerciseName: exercises.name,
       exerciseType: exercises.type,
+      isBodyweightPlus: exercises.isBodyweightPlus,
       weightKg: setLogs.weightKg,
       reps: setLogs.reps,
     })

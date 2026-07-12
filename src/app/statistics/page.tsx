@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import { BackButton } from "@/components/nav/back-button";
 import { LineChart } from "@/components/charts/line-chart";
 import { Stats1RmCard } from "@/components/statistics/stats-1rm-card";
+import { PrList } from "@/components/statistics/pr-list";
 import { getActiveProgram, getStatsRows } from "@/lib/queries";
 import {
   weeklyVolume,
   consistency,
-  prTimeline,
+  exerciseBests,
   estimated1RmByExercise,
 } from "@/lib/stats";
-import { formatSet, formatRelativeDay } from "@/lib/format";
+import { formatWeight, formatRelativeDay } from "@/lib/format";
 import { getDict, getLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Stats · Forge" };
@@ -26,7 +27,7 @@ export default async function StatisticsPage() {
 
   const volume = weeklyVolume(rows);
   const cons = consistency(rows);
-  const prs = prTimeline(rows);
+  const bests = exerciseBests(rows);
   const e1rm = estimated1RmByExercise(rows);
 
   const shortDate = (d: Date) =>
@@ -37,10 +38,19 @@ export default async function StatisticsPage() {
     label: shortDate(v.weekStart),
     value: Math.round((v.volumeKg / 1000) * 10) / 10,
   }));
-  const maxWeekCount = cons.weeklyCounts.reduce(
-    (m, w) => Math.max(m, w.count),
-    0
-  );
+
+  // Last 14 weeks incl. zero-session gaps; the dense series always ends at the
+  // current week, so the final bar is "this week".
+  const weeks = cons.weeklyCounts.slice(-14);
+  const maxWeekCount = weeks.reduce((m, w) => Math.max(m, w.count), 0);
+  const maxWeekIdx = weeks.findIndex((w) => w.count === maxWeekCount);
+
+  const prItems = bests.map((b) => ({
+    exerciseId: b.exerciseId,
+    name: b.exerciseName,
+    value: `${b.isBodyweightPlus ? "+" : ""}${formatWeight(b.weightKg)} ${t.session.kg} × ${b.reps}`,
+    day: formatRelativeDay(b.performedAt, t.common, locale),
+  }));
 
   return (
     <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
@@ -89,53 +99,60 @@ export default async function StatisticsPage() {
             <p className="mb-3 text-[10px] tracking-[0.18em] text-muted-foreground uppercase">
               {t.statistics.sessionsPerWeek}
             </p>
-            <div className="flex h-16 items-end gap-1">
-              {cons.weeklyCounts.slice(-14).map((w) => (
-                <div
-                  key={w.weekStart.getTime()}
-                  className="flex-1 rounded-t-[3px] bg-primary/70"
-                  style={{
-                    height: `${maxWeekCount ? Math.max((w.count / maxWeekCount) * 100, 8) : 0}%`,
-                  }}
-                  title={`${shortDate(w.weekStart)} · ${w.count}`}
-                />
-              ))}
+            <div className="flex h-20 items-end gap-1 border-b border-border">
+              {weeks.map((w, i) => {
+                const isCurrent = i === weeks.length - 1;
+                // Selective labels: only the current week and the best week.
+                const labeled =
+                  w.count > 0 && (isCurrent || i === maxWeekIdx);
+                return (
+                  <div
+                    key={w.weekStart.getTime()}
+                    className="flex flex-1 flex-col items-center justify-end gap-1"
+                    title={`${shortDate(w.weekStart)} · ${w.count}`}
+                  >
+                    {labeled && (
+                      <span
+                        className={`font-display text-[10px] font-semibold leading-none ${
+                          isCurrent ? "text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
+                        {w.count}
+                      </span>
+                    )}
+                    {w.count === 0 ? (
+                      <div className="h-[2px] w-full max-w-[24px] rounded-full bg-primary/25" />
+                    ) : (
+                      <div
+                        className={`w-full max-w-[24px] rounded-t-[4px] ${
+                          isCurrent ? "bg-primary" : "bg-primary/55"
+                        }`}
+                        style={{
+                          height: `${Math.max((w.count / maxWeekCount) * 56, 6)}px`,
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
+              <span>{weeks.length > 0 && shortDate(weeks[0].weekStart)}</span>
+              <span>{t.statistics.thisWeek}</span>
             </div>
           </section>
 
-          {/* PR timeline */}
-          <section>
-            <h2 className="mb-2 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">
-              {t.statistics.prs}
-            </h2>
-            {prs.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                {t.statistics.noPrs}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {[...prs].reverse().map((pr, i) => (
-                  <li
-                    key={`${pr.performedAt.getTime()}-${pr.exerciseName}-${i}`}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span className="min-w-0 truncate text-[13px] text-foreground/75">
-                      {pr.exerciseName}
-                    </span>
-                    <span className="shrink-0">
-                      <span className="font-display text-[16px] font-semibold tracking-[0.06em] text-success">
-                        {formatSet(pr.weightKg, pr.reps)}
-                      </span>
-                      <span className="text-[12px] text-muted-foreground">
-                        {" "}
-                        · {formatRelativeDay(pr.performedAt, t.common, locale)}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {/* Personal records — all-time best per exercise, deduplicated */}
+          <PrList
+            items={prItems}
+            labels={{
+              title: t.statistics.prs,
+              empty: t.statistics.noPrs,
+              showAll: t.statistics.showAll,
+              showLess: t.statistics.showLess,
+            }}
+          />
+
 
           {/* Estimated 1RM per exercise */}
           <Stats1RmCard series={e1rm} />
