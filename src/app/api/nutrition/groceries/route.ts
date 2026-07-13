@@ -12,7 +12,8 @@ import { buildCoachingBrief } from "@/lib/coach";
 import { getCoachProvider } from "@/lib/coach-config";
 import { getNutritionConfig } from "@/lib/nutrition-config";
 import { NUTRITION_SYSTEM_PROMPT, buildNutritionBrief } from "@/lib/nutrition";
-import { streamCoach, type CoachMessage } from "@/lib/coach-stream";
+import { streamCoachWithRetry, type CoachMessage } from "@/lib/coach-stream";
+import { coachStreamResponse } from "@/lib/coach-response";
 import { getLocale, getDict } from "@/lib/i18n/server";
 import { LANGUAGE_DIRECTIVE } from "@/lib/i18n/config";
 
@@ -77,28 +78,11 @@ export async function POST(request: Request) {
     (constraint ? ` Extra constraint for this week: ${constraint}` : "");
   const messages: CoachMessage[] = [{ role: "user", content: ask }];
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        for await (const chunk of streamCoach(provider, system, messages)) {
-          controller.enqueue(encoder.encode(chunk));
-        }
-        controller.close();
-      } catch (err) {
-        // 200 headers are already sent — surface a readable note in-stream.
-        console.error("[nutrition] stream error", err);
-        controller.enqueue(encoder.encode(t.common.aiStreamError));
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "no-store",
-    },
+  // Retries transient provider failures server-side; pre-stream failures
+  // become real HTTP errors (see coach-response.ts), mid-stream degrades
+  // in-band.
+  return coachStreamResponse(streamCoachWithRetry(provider, system, messages), {
+    logTag: "nutrition",
+    midStreamText: t.common.aiStreamError,
   });
 }

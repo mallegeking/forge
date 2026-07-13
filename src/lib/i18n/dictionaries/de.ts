@@ -23,6 +23,14 @@ export const de: Dictionary = {
     connectionLost: "⚠️ Verbindung verloren. Bitte versuche es erneut.",
     aiStreamError:
       "\n\n⚠️ Fehler beim Erreichen des Modells. Bitte versuche es erneut.",
+    aiRateLimited:
+      "Der KI-Anbieter drosselt gerade die Anfragen — kurz warten hilft meist.",
+    aiOverloaded:
+      "Das Modell ist kurzzeitig überlastet. Ein neuer Versuch klappt meist.",
+    aiAuthError:
+      "Der Anbieter hat den API-Key abgelehnt — prüf die Coach-Einstellungen.",
+    aiUnreachable:
+      "Das Modell war nicht erreichbar. Prüf die Verbindung und versuch es erneut.",
   },
 
   weekdays: [

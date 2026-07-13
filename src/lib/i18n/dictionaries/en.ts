@@ -25,6 +25,11 @@ export const en = {
     retryAction: "Retry",
     connectionLost: "⚠️ Connection lost. Please try again.",
     aiStreamError: "\n\n⚠️ Hit an error reaching the model. Please try again.",
+    aiRateLimited:
+      "The AI provider is rate-limiting requests right now — a short wait usually clears it.",
+    aiOverloaded: "The model is briefly overloaded. Retrying usually works.",
+    aiAuthError: "The provider rejected the API key — check the coach settings.",
+    aiUnreachable: "Couldn't reach the model. Check your connection and retry.",
   },
 
   weekdays: [

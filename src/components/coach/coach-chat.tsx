@@ -115,17 +115,37 @@ function LiftCardView({ card }: { card: LiftCard }) {
 
 // --- Chat -------------------------------------------------------------------
 
+/** A failed request, classified by the route (see coach-response.ts). */
+type CoachFailure = {
+  reason: string;
+  /** When a rate limit told us to wait: earliest sensible retry time (ms). */
+  retryAt: number | null;
+};
+
 export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
   const t = useT();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState(initialInput);
   const [streaming, setStreaming] = useState(false);
   const [disabled, setDisabled] = useState(false);
+  const [failure, setFailure] = useState<CoachFailure | null>(null);
+  // Ticks while a retry countdown is showing, forcing re-renders.
+  const [, setCountdownTick] = useState(0);
+  const lastHistory = useRef<Msg[] | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+  }, [messages, failure]);
+
+  useEffect(() => {
+    if (!failure?.retryAt) return;
+    const id = setInterval(() => {
+      setCountdownTick((n) => n + 1);
+      if (Date.now() >= failure.retryAt!) clearInterval(id);
+    }, 500);
+    return () => clearInterval(id);
+  }, [failure]);
 
   function appendToLast(chunk: string) {
     setMessages((prev) => {
@@ -137,14 +157,14 @@ export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
     });
   }
 
-  async function send(text: string) {
-    const content = text.trim();
-    if (!content || streaming || disabled) return;
-
-    const history: Msg[] = [...messages, { role: "user", content }];
+  async function run(history: Msg[]) {
+    lastHistory.current = history;
+    setFailure(null);
     setMessages([...history, { role: "assistant", content: "" }]);
-    setInput("");
     setStreaming(true);
+    // Whether any model text arrived — decides between "roll back and show a
+    // retryable error card" and "keep the partial reply, note the break".
+    let received = false;
 
     try {
       const res = await fetch("/api/coach", {
@@ -155,11 +175,31 @@ export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
 
       if (res.status === 503) {
         setDisabled(true);
-        setMessages(messages); // roll back the optimistic user + placeholder
+        setMessages(history.slice(0, -1)); // roll back the optimistic turn
         return;
       }
       if (!res.ok || !res.body) {
-        appendToLast(t.common.retry);
+        // Classified provider failure — drop the empty placeholder (the user
+        // message stays) and show the reason with a retry.
+        setMessages(history);
+        let reason = "other";
+        let retryAfterSeconds: number | null = null;
+        try {
+          const body = (await res.json()) as {
+            error?: string;
+            retryAfterSeconds?: number | null;
+          };
+          if (body.error) reason = body.error;
+          retryAfterSeconds = body.retryAfterSeconds ?? null;
+        } catch {
+          // non-JSON body — keep the generic reason
+        }
+        setFailure({
+          reason,
+          retryAt: retryAfterSeconds
+            ? Date.now() + retryAfterSeconds * 1000
+            : null,
+        });
         return;
       }
 
@@ -168,14 +208,46 @@ export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        appendToLast(decoder.decode(value, { stream: true }));
+        const chunk = decoder.decode(value, { stream: true });
+        if (chunk) received = true;
+        appendToLast(chunk);
       }
     } catch {
-      appendToLast(t.common.connectionLost);
+      if (received) {
+        // Mid-stream network break — keep the partial reply, note the cut.
+        appendToLast(t.common.connectionLost);
+      } else {
+        setMessages(history);
+        setFailure({ reason: "network", retryAt: null });
+      }
     } finally {
       setStreaming(false);
     }
   }
+
+  async function send(text: string) {
+    const content = text.trim();
+    if (!content || streaming || disabled) return;
+    setInput("");
+    await run([...messages, { role: "user", content }]);
+  }
+
+  function retry() {
+    if (!streaming && lastHistory.current) void run(lastHistory.current);
+  }
+
+  const failureText = (reason: string) =>
+    reason === "rate_limited"
+      ? t.common.aiRateLimited
+      : reason === "overloaded"
+        ? t.common.aiOverloaded
+        : reason === "auth"
+          ? t.common.aiAuthError
+          : t.common.aiUnreachable;
+
+  const retryWaitSeconds = failure?.retryAt
+    ? Math.max(0, Math.ceil((failure.retryAt - Date.now()) / 1000))
+    : 0;
 
   if (disabled) {
     return (
@@ -239,6 +311,25 @@ export function CoachChat({ initialInput = "" }: { initialInput?: string }) {
               />
             )
           )
+        )}
+        {failure && !streaming && (
+          <div className="flex justify-start">
+            <div className="flex max-w-[90%] flex-col items-start gap-2.5 rounded-[16px] rounded-bl-[4px] bg-card px-3.5 py-3">
+              <p className="text-sm leading-[1.5] text-foreground/90">
+                ⚠️ {failureText(failure.reason)}
+              </p>
+              <button
+                type="button"
+                onClick={retry}
+                disabled={retryWaitSeconds > 0}
+                className="rounded-[10px] bg-primary px-3.5 py-2 text-[12px] font-semibold text-primary-foreground transition-transform active:scale-[0.97] disabled:opacity-50"
+              >
+                {retryWaitSeconds > 0
+                  ? `${t.common.retryAction} (${retryWaitSeconds}s)`
+                  : t.common.retryAction}
+              </button>
+            </div>
+          </div>
         )}
         <div ref={endRef} />
       </div>

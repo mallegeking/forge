@@ -14,7 +14,8 @@ import {
   type ExerciseTipSession,
 } from "@/lib/coach";
 import { getCoachProvider } from "@/lib/coach-config";
-import { streamCoach } from "@/lib/coach-stream";
+import { streamCoachWithRetry } from "@/lib/coach-stream";
+import { coachStreamResponse } from "@/lib/coach-response";
 import { getLocale } from "@/lib/i18n/server";
 import { LANGUAGE_DIRECTIVE } from "@/lib/i18n/config";
 
@@ -76,32 +77,13 @@ export async function POST(request: Request) {
 
   const system = `${COACH_TIP_SYSTEM_PROMPT}${LANGUAGE_DIRECTIVE[locale]}`;
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        for await (const chunk of streamCoach(provider, system, [
-          { role: "user", content: brief },
-        ])) {
-          controller.enqueue(encoder.encode(chunk));
-        }
-        controller.close();
-      } catch (err) {
-        // 200 headers are already sent, so signal the failure in-band with a
-        // NUL sentinel — the session UI discards the partial tip, shows its own
-        // localized error line, and offers a retry (it must NOT cache this).
-        console.error("[coach/tip] stream error", err);
-        controller.enqueue(encoder.encode(TIP_STREAM_ERROR_SENTINEL));
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "no-store",
-    },
-  });
+  // Retries transient provider failures server-side; a failure before the
+  // first token becomes a real HTTP error the session UI already treats as
+  // transient-with-retry. A mid-stream break still signals in-band with the
+  // NUL sentinel — the UI discards the partial tip and offers a retry
+  // (it must NOT cache the failure).
+  return coachStreamResponse(
+    streamCoachWithRetry(provider, system, [{ role: "user", content: brief }]),
+    { logTag: "coach/tip", midStreamText: TIP_STREAM_ERROR_SENTINEL }
+  );
 }
