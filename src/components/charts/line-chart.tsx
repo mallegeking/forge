@@ -1,6 +1,11 @@
 import { formatWeight } from "@/lib/format";
 
-type Point = { label: string; value: number };
+type Point = {
+  label: string;
+  value: number;
+  /** Draw a hollow marker — a planned deload, not a real dip. */
+  muted?: boolean;
+};
 
 /** Largest "nice" step (1/2/2.5/5 × 10ⁿ) that is ≤ raw. */
 function niceStep(raw: number): number {
@@ -65,11 +70,17 @@ export function LineChart({
   const baselineY = pad.t + innerH;
   const areaPoints = `${linePoints} ${x(data.length - 1)},${baselineY} ${x(0)},${baselineY}`;
 
-  // Markers stay legible on dense series: past 12 points only the endpoints and
-  // the extremes get a dot; the line carries the rest.
+  // Markers stay legible on dense series: past 12 points only the endpoints,
+  // the extremes and muted (deload) points get a dot; the line carries the rest.
   const markerIdx = new Set(
     data.length > 12
-      ? [0, data.length - 1, values.indexOf(max), values.indexOf(min)]
+      ? [
+          0,
+          data.length - 1,
+          values.indexOf(max),
+          values.indexOf(min),
+          ...data.flatMap((d, i) => (d.muted ? [i] : [])),
+        ]
       : data.map((_, i) => i)
   );
 
@@ -129,8 +140,9 @@ export function LineChart({
               cx={x(i)}
               cy={y(d.value)}
               r={4}
-              fill="currentColor"
-              stroke="var(--card)"
+              // Muted (deload) points invert: hollow ring instead of solid dot.
+              fill={d.muted ? "var(--card)" : "currentColor"}
+              stroke={d.muted ? "currentColor" : "var(--card)"}
               strokeWidth={2}
             />
           ) : null

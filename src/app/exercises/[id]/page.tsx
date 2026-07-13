@@ -25,6 +25,7 @@ export default async function ExercisePage({
       month: "short",
     }),
     value: p.topWeightKg,
+    muted: p.isDeload,
   }));
 
   // Plateau detection runs over most-recent-first session summaries. Deload
@@ -107,6 +108,11 @@ export default async function ExercisePage({
           {t.exercise.topSet}
         </p>
         <LineChart data={chartData} />
+        {chartData.some((p) => p.muted) && (
+          <p className="mt-1 text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
+            {t.statistics.deloadHint}
+          </p>
+        )}
       </div>
 
       <h2 className="mb-2 font-semibold text-[11px] tracking-[0.22em] text-muted-foreground uppercase">

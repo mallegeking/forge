@@ -6,11 +6,14 @@
 // per-session grouping below never assumes intra-session order.
 
 import type { ExerciseType } from "@/db/schema";
+import { detectPlateau, type RepRange } from "@/lib/progression";
 
 /** One logged set with the session + exercise context the aggregations need. */
 export type StatsRow = {
   sessionId: string;
   performedAt: Date;
+  /** The set was logged in a planned deload session. */
+  isDeload?: boolean;
   exerciseId: string;
   exerciseName: string;
   exerciseType: ExerciseType;
@@ -21,7 +24,7 @@ export type StatsRow = {
 };
 
 /** Monday-00:00 local for the week containing `d` (matches the rest of the app). */
-function weekStartOf(d: Date): Date {
+export function weekStartOf(d: Date): Date {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // 0 = Monday … 6 = Sunday
   return date;
@@ -48,6 +51,8 @@ export type WeeklyVolumePoint = {
   volumeKg: number;
   compoundKg: number;
   isolationKg: number;
+  /** The week contains at least one planned deload session. */
+  hasDeload: boolean;
 };
 
 /** Total tonnage per calendar week (Monday start), oldest week first. */
@@ -62,18 +67,93 @@ export function weeklyVolume(rows: StatsRow[]): WeeklyVolumePoint[] {
       acc.volumeKg += vol;
       if (r.exerciseType === "compound") acc.compoundKg += vol;
       else acc.isolationKg += vol;
+      acc.hasDeload ||= r.isDeload ?? false;
     } else {
       byWeek.set(key, {
         weekStart,
         volumeKg: vol,
         compoundKg: r.exerciseType === "compound" ? vol : 0,
         isolationKg: r.exerciseType === "isolation" ? vol : 0,
+        hasDeload: r.isDeload ?? false,
       });
     }
   }
   return Array.from(byWeek.values()).sort(
     (a, b) => a.weekStart.getTime() - b.weekStart.getTime()
   );
+}
+
+// ---------------------------------------------------------------------------
+// Four-week deltas
+// ---------------------------------------------------------------------------
+
+export type FourWeekDeltas = {
+  sessions: { current: number; previous: number };
+  volumeKg: { current: number; previous: number };
+  /**
+   * Training exists before the current window, so "vs previous" is a real
+   * comparison rather than an artifact of a program younger than 8 weeks.
+   */
+  hasPrior: boolean;
+};
+
+/**
+ * Rolling 28-day windows ending today: sessions and tonnage in the last four
+ * weeks vs the four weeks before that. Deltas answer "am I doing more or less
+ * than before?" — the framing the headline tiles use.
+ */
+export function fourWeekDeltas(rows: StatsRow[], now = new Date()): FourWeekDeltas {
+  const DAY = 24 * 60 * 60 * 1000;
+  const end =
+    new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() + DAY;
+  const cutCurrent = end - 28 * DAY;
+  const cutPrevious = end - 56 * DAY;
+
+  const currentSessions = new Set<string>();
+  const previousSessions = new Set<string>();
+  let currentVolume = 0;
+  let previousVolume = 0;
+  let hasPrior = false;
+
+  for (const r of rows) {
+    const t = r.performedAt.getTime();
+    if (t < cutCurrent) hasPrior = true;
+    const vol = r.weightKg * r.reps;
+    if (t >= cutCurrent && t < end) {
+      currentSessions.add(r.sessionId);
+      currentVolume += vol;
+    } else if (t >= cutPrevious && t < cutCurrent) {
+      previousSessions.add(r.sessionId);
+      previousVolume += vol;
+    }
+  }
+
+  return {
+    sessions: { current: currentSessions.size, previous: previousSessions.size },
+    volumeKg: { current: currentVolume, previous: previousVolume },
+    hasPrior,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Daily session counts (consistency heatmap)
+// ---------------------------------------------------------------------------
+
+/**
+ * Unique sessions per local calendar day, keyed by that day's midnight
+ * timestamp — the heatmap's data.
+ */
+export function dailySessionCounts(rows: StatsRow[]): Map<number, number> {
+  const seen = new Set<string>();
+  const byDay = new Map<number, number>();
+  for (const r of rows) {
+    if (seen.has(r.sessionId)) continue;
+    seen.add(r.sessionId);
+    const d = r.performedAt;
+    const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    byDay.set(key, (byDay.get(key) ?? 0) + 1);
+  }
+  return byDay;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +371,7 @@ export type E1rmSeries = {
   name: string;
   /** Total sets logged — used to surface the most-trained lift first. */
   setCount: number;
-  points: { performedAt: Date; e1rm: number }[];
+  points: { performedAt: Date; e1rm: number; isDeload: boolean }[];
 };
 
 /** Epley estimated one-rep-max for a single set. */
@@ -308,7 +388,7 @@ export function estimated1RmByExercise(rows: StatsRow[]): E1rmSeries[] {
   type Ex = {
     name: string;
     setCount: number;
-    bySession: Map<string, { performedAt: Date; e1rm: number }>;
+    bySession: Map<string, { performedAt: Date; e1rm: number; isDeload: boolean }>;
   };
   const byExercise = new Map<string, Ex>();
 
@@ -321,7 +401,12 @@ export function estimated1RmByExercise(rows: StatsRow[]): E1rmSeries[] {
     ex.setCount += 1;
     const e1rm = epley1Rm(r.weightKg, r.reps);
     const cur = ex.bySession.get(r.sessionId);
-    if (!cur) ex.bySession.set(r.sessionId, { performedAt: r.performedAt, e1rm });
+    if (!cur)
+      ex.bySession.set(r.sessionId, {
+        performedAt: r.performedAt,
+        e1rm,
+        isDeload: r.isDeload ?? false,
+      });
     else if (e1rm > cur.e1rm) cur.e1rm = e1rm;
   }
 
@@ -335,7 +420,96 @@ export function estimated1RmByExercise(rows: StatsRow[]): E1rmSeries[] {
         .map((p) => ({
           performedAt: p.performedAt,
           e1rm: Math.round(p.e1rm * 10) / 10,
+          isDeload: p.isDeload,
         })),
     }))
     .sort((a, b) => b.setCount - a.setCount || a.name.localeCompare(b.name));
+}
+
+// ---------------------------------------------------------------------------
+// Stalled exercises (plateau scan)
+// ---------------------------------------------------------------------------
+
+export type StalledExercise = {
+  exerciseId: string;
+  exerciseName: string;
+  /** The weight the exercise is stuck at. */
+  weightKg: number;
+  /** Consecutive non-deload sessions stuck there. */
+  consecutive: number;
+};
+
+/**
+ * Every exercise currently plateaued, most-stuck first: same top weight without
+ * hitting the top of the rep range for ≥3 consecutive recent sessions
+ * (deload sessions skipped — their planned lighter load isn't a stall).
+ * Mirrors the per-exercise detail page's detectPlateau usage, but scans the
+ * whole program so the stats page can surface stalls unprompted.
+ */
+export function stalledExercises(
+  rows: StatsRow[],
+  ranges: Map<string, RepRange>
+): StalledExercise[] {
+  type SessionAgg = {
+    performedAt: Date;
+    isDeload: boolean;
+    totalSets: number;
+    minReps: number;
+    topWeightKg: number;
+  };
+  const byExercise = new Map<
+    string,
+    { name: string; sessions: Map<string, SessionAgg> }
+  >();
+
+  for (const r of rows) {
+    let ex = byExercise.get(r.exerciseId);
+    if (!ex) {
+      ex = { name: r.exerciseName, sessions: new Map() };
+      byExercise.set(r.exerciseId, ex);
+    }
+    const s = ex.sessions.get(r.sessionId);
+    if (!s) {
+      ex.sessions.set(r.sessionId, {
+        performedAt: r.performedAt,
+        isDeload: r.isDeload ?? false,
+        totalSets: 1,
+        minReps: r.reps,
+        topWeightKg: r.weightKg,
+      });
+    } else {
+      s.totalSets += 1;
+      s.minReps = Math.min(s.minReps, r.reps);
+      s.topWeightKg = Math.max(s.topWeightKg, r.weightKg);
+    }
+  }
+
+  const out: StalledExercise[] = [];
+  for (const [exerciseId, ex] of byExercise) {
+    const rx = ranges.get(exerciseId);
+    if (!rx) continue;
+    // Most-recent-first, deloads excluded — same shape the exercise page feeds
+    // detectPlateau (see getExerciseHistory + /exercises/[id]).
+    const summaries = Array.from(ex.sessions.values())
+      .sort((a, b) => b.performedAt.getTime() - a.performedAt.getTime())
+      .filter((s) => !s.isDeload)
+      .map((s) => ({
+        weightKg: s.topWeightKg,
+        hitTopOfRange: s.totalSets >= rx.targetSets && s.minReps >= rx.repMax,
+      }));
+    const p = detectPlateau(summaries);
+    if (p.isPlateau && p.weightKg != null) {
+      out.push({
+        exerciseId,
+        exerciseName: ex.name,
+        weightKg: p.weightKg,
+        consecutive: p.consecutive,
+      });
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      b.consecutive - a.consecutive ||
+      a.exerciseName.localeCompare(b.exerciseName)
+  );
 }

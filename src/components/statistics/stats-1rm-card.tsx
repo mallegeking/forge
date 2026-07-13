@@ -13,7 +13,7 @@ import { formatWeight } from "@/lib/format";
 type Series = {
   exerciseId: string;
   name: string;
-  points: { performedAt: string | Date; e1rm: number }[];
+  points: { performedAt: string | Date; e1rm: number; isDeload?: boolean }[];
 };
 
 const MAX_PILLS = 6;
@@ -44,6 +44,7 @@ export function Stats1RmCard({ series }: { series: Series[] }) {
       month: "short",
     }),
     value: p.e1rm,
+    muted: p.isDeload ?? false,
   }));
   const latest = current.points[current.points.length - 1];
 
@@ -89,6 +90,11 @@ export function Stats1RmCard({ series }: { series: Series[] }) {
       )}
 
       <LineChart data={data} ariaLabel={t.statistics.e1rm} />
+      {data.some((d) => d.muted) && (
+        <p className="mt-1 text-[9px] tracking-[0.08em] text-muted-foreground uppercase">
+          {t.statistics.deloadHint}
+        </p>
+      )}
     </div>
   );
 }

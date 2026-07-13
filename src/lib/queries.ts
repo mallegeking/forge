@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
 import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
+import type { RepRange } from "@/lib/progression";
 import { getSetting } from "@/lib/mutations";
 import type {
   CoachingSnapshot,
@@ -350,6 +351,7 @@ export async function getStatsRows(programId: string): Promise<StatsRow[]> {
     .select({
       sessionId: setLogs.sessionId,
       performedAt: workoutSessions.performedAt,
+      isDeload: workoutSessions.isDeload,
       exerciseId: setLogs.exerciseId,
       exerciseName: exercises.name,
       exerciseType: exercises.type,
@@ -367,6 +369,38 @@ export async function getStatsRows(programId: string): Promise<StatsRow[]> {
       )
     )
     .orderBy(asc(workoutSessions.performedAt));
+}
+
+/**
+ * Prescribed rep range per exercise in a program — one entry per exercise
+ * (first prescription wins, mirroring getExerciseHistory's `limit 1`). Feeds
+ * plateau detection on the stats page.
+ */
+export async function getExerciseRepRanges(
+  programId: string
+): Promise<Map<string, RepRange>> {
+  const rows = await db
+    .select({
+      exerciseId: programDayExercises.exerciseId,
+      targetSets: programDayExercises.targetSets,
+      repMin: programDayExercises.repMin,
+      repMax: programDayExercises.repMax,
+    })
+    .from(programDayExercises)
+    .innerJoin(programDays, eq(programDayExercises.dayId, programDays.id))
+    .where(eq(programDays.programId, programId));
+
+  const byExercise = new Map<string, RepRange>();
+  for (const r of rows) {
+    if (!byExercise.has(r.exerciseId)) {
+      byExercise.set(r.exerciseId, {
+        targetSets: r.targetSets,
+        repMin: r.repMin,
+        repMax: r.repMax,
+      });
+    }
+  }
+  return byExercise;
 }
 
 /**

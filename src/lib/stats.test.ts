@@ -6,8 +6,12 @@ import {
   exerciseBests,
   estimated1RmByExercise,
   epley1Rm,
+  fourWeekDeltas,
+  dailySessionCounts,
+  stalledExercises,
   type StatsRow,
 } from "./stats";
+import type { RepRange } from "./progression";
 
 // Mon 2026-06-01 .. Sun 2026-06-07 is one week; the next week starts 2026-06-08.
 const set = (
@@ -19,6 +23,7 @@ const set = (
   exerciseName: opts.exerciseName ?? "Squat",
   exerciseType: opts.exerciseType ?? "compound",
   isBodyweightPlus: opts.isBodyweightPlus,
+  isDeload: opts.isDeload,
   weightKg: opts.weightKg ?? 100,
   reps: opts.reps ?? 5,
 });
@@ -159,6 +164,127 @@ describe("exerciseBests", () => {
       set({ sessionId: "s1", y: 2026, m: 6, d: 1, isBodyweightPlus: true, weightKg: 5, reps: 8 }),
     ]);
     expect(bests[0].isBodyweightPlus).toBe(true);
+  });
+});
+
+describe("fourWeekDeltas", () => {
+  it("splits sessions and volume into current vs previous 28-day windows", () => {
+    const now = new Date(2026, 6, 14); // Jul 14
+    const d = fourWeekDeltas(
+      [
+        set({ sessionId: "old", y: 2026, m: 5, d: 1, weightKg: 100, reps: 5 }), // before both windows
+        set({ sessionId: "p1", y: 2026, m: 5, d: 25, weightKg: 100, reps: 10 }), // May 25 — previous window
+        set({ sessionId: "c1", y: 2026, m: 7, d: 1, weightKg: 100, reps: 10 }), // current window
+        set({ sessionId: "c2", y: 2026, m: 7, d: 10, weightKg: 50, reps: 10 }), // current window
+      ],
+      now
+    );
+    expect(d.sessions.current).toBe(2);
+    expect(d.volumeKg.current).toBe(1500);
+    expect(d.sessions.previous).toBe(1);
+    expect(d.volumeKg.previous).toBe(1000);
+    expect(d.hasPrior).toBe(true);
+  });
+
+  it("reports no prior training for a young program", () => {
+    const now = new Date(2026, 6, 14);
+    const d = fourWeekDeltas(
+      [set({ sessionId: "c1", y: 2026, m: 7, d: 1 })],
+      now
+    );
+    expect(d.hasPrior).toBe(false);
+    expect(d.sessions.previous).toBe(0);
+  });
+});
+
+describe("dailySessionCounts", () => {
+  it("counts unique sessions per local day", () => {
+    const counts = dailySessionCounts([
+      set({ sessionId: "s1", y: 2026, m: 6, d: 1 }),
+      set({ sessionId: "s1", y: 2026, m: 6, d: 1, exerciseId: "curl" }), // same session
+      set({ sessionId: "s2", y: 2026, m: 6, d: 1 }), // second session same day
+      set({ sessionId: "s3", y: 2026, m: 6, d: 3 }),
+    ]);
+    expect(counts.get(new Date(2026, 5, 1).getTime())).toBe(2);
+    expect(counts.get(new Date(2026, 5, 3).getTime())).toBe(1);
+    expect(counts.size).toBe(2);
+  });
+});
+
+describe("stalledExercises", () => {
+  const rx: RepRange = { targetSets: 2, repMin: 8, repMax: 12 };
+  const ranges = new Map([["squat", rx]]);
+  // Two sets at the same weight, below the top of the rep range → not hitting top.
+  const stuckSession = (sessionId: string, d: number, weightKg = 100) => [
+    set({ sessionId, y: 2026, m: 6, d, weightKg, reps: 9 }),
+    set({ sessionId, y: 2026, m: 6, d, weightKg, reps: 8 }),
+  ];
+
+  it("flags an exercise stuck at the same weight for 3 sessions", () => {
+    const stalled = stalledExercises(
+      [
+        ...stuckSession("s1", 1),
+        ...stuckSession("s2", 8),
+        ...stuckSession("s3", 15),
+      ],
+      ranges
+    );
+    expect(stalled).toHaveLength(1);
+    expect(stalled[0].exerciseName).toBe("Squat");
+    expect(stalled[0].weightKg).toBe(100);
+    expect(stalled[0].consecutive).toBe(3);
+  });
+
+  it("skips deload sessions instead of breaking the streak", () => {
+    const deload = [
+      set({ sessionId: "dl", y: 2026, m: 6, d: 10, weightKg: 60, reps: 10, isDeload: true }),
+    ];
+    const stalled = stalledExercises(
+      [
+        ...stuckSession("s1", 1),
+        ...stuckSession("s2", 8),
+        ...deload,
+        ...stuckSession("s3", 15),
+      ],
+      ranges
+    );
+    expect(stalled).toHaveLength(1);
+    expect(stalled[0].consecutive).toBe(3);
+  });
+
+  it("does not flag progress or top-of-range sessions", () => {
+    const topOut = [
+      set({ sessionId: "s3", y: 2026, m: 6, d: 15, weightKg: 100, reps: 12 }),
+      set({ sessionId: "s3", y: 2026, m: 6, d: 15, weightKg: 100, reps: 12 }),
+    ];
+    const stalled = stalledExercises(
+      [...stuckSession("s1", 1), ...stuckSession("s2", 8), ...topOut],
+      ranges
+    );
+    expect(stalled).toHaveLength(0); // most recent session hit the top — no stall
+  });
+
+  it("ignores exercises without a prescription", () => {
+    const stalled = stalledExercises(
+      [
+        ...stuckSession("s1", 1),
+        ...stuckSession("s2", 8),
+        ...stuckSession("s3", 15),
+      ],
+      new Map()
+    );
+    expect(stalled).toHaveLength(0);
+  });
+});
+
+describe("weeklyVolume deload flag", () => {
+  it("marks weeks containing a deload session", () => {
+    const points = weeklyVolume([
+      set({ sessionId: "s1", y: 2026, m: 6, d: 1 }),
+      set({ sessionId: "s2", y: 2026, m: 6, d: 8, isDeload: true }),
+    ]);
+    expect(points[0].hasDeload).toBe(false);
+    expect(points[1].hasDeload).toBe(true);
   });
 });
 
