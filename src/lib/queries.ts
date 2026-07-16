@@ -7,13 +7,19 @@ import {
   workoutSessions,
   setLogs,
   sessionExerciseNotes,
+  sessionTips,
   bodyweightLogs,
   progressPhotos,
   type ExerciseType,
 } from "@/db/schema";
 import { and, asc, count, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
-import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
-import type { RepRange } from "@/lib/progression";
+import {
+  computeTrainingWeek,
+  resolveDeload,
+  readinessToIncrease,
+  summarizeExerciseSession,
+} from "@/lib/progression";
+import type { RepRange, Readiness } from "@/lib/progression";
 import { getSetting } from "@/lib/mutations";
 import type {
   CoachingSnapshot,
@@ -123,6 +129,24 @@ export async function getLastSessionSetsForExercise(
   exerciseId: string,
   currentSessionId: string
 ): Promise<{ performedAt: Date; sets: LoggedSetRow[] } | null> {
+  const recent = await getRecentPriorSessionsForExercise(
+    exerciseId,
+    currentSessionId,
+    1
+  );
+  return recent[0] ?? null;
+}
+
+/**
+ * The last `limit` non-deload prior sessions of an exercise (most-recent
+ * first), each with its sets. Two sessions are enough for the consolidation
+ * rule: readiness compares the latest session's top weight with the one before.
+ */
+export async function getRecentPriorSessionsForExercise(
+  exerciseId: string,
+  currentSessionId: string,
+  limit: number
+): Promise<{ performedAt: Date; sets: LoggedSetRow[] }[]> {
   const rows = await db
     .select({
       id: setLogs.id,
@@ -143,21 +167,34 @@ export async function getLastSessionSetsForExercise(
     )
     .orderBy(desc(workoutSessions.performedAt), asc(setLogs.setNumber));
 
-  if (rows.length === 0) return null;
-
-  // Keep only the sets belonging to the most recent prior session.
-  const latestSessionId = rows[0].sessionId;
-  const sets = rows
-    .filter((r) => r.sessionId === latestSessionId)
-    .map(({ id, setNumber, weightKg, reps }) => ({ id, setNumber, weightKg, reps }));
-
-  return { performedAt: rows[0].performedAt, sets };
+  const sessions: { performedAt: Date; sets: LoggedSetRow[] }[] = [];
+  const byId = new Map<string, { performedAt: Date; sets: LoggedSetRow[] }>();
+  for (const r of rows) {
+    let s = byId.get(r.sessionId);
+    if (!s) {
+      if (sessions.length >= limit) break; // rows are session-ordered
+      s = { performedAt: r.performedAt, sets: [] };
+      byId.set(r.sessionId, s);
+      sessions.push(s);
+    }
+    s.sets.push({
+      id: r.id,
+      setNumber: r.setNumber,
+      weightKg: r.weightKg,
+      reps: r.reps,
+    });
+  }
+  return sessions;
 }
 
 export type SessionExerciseView = DayExercise & {
   loggedSets: LoggedSetRow[];
   note: string | null;
   lastSession: { performedAt: Date; sets: LoggedSetRow[] } | null;
+  /** Consolidation-aware pre-session readiness (over prior sessions only). */
+  readiness: Readiness;
+  /** Pre-generated AI tip for this exercise, if already stored. */
+  tip: string | null;
 };
 
 export type SessionView = {
@@ -195,7 +232,7 @@ export async function getSessionView(sessionId: string): Promise<SessionView | n
 
   if (!session) return null;
 
-  const [prescriptions, logs, notes] = await Promise.all([
+  const [prescriptions, logs, notes, tips] = await Promise.all([
     getDayExercises(session.dayId),
     db
       .select()
@@ -206,6 +243,10 @@ export async function getSessionView(sessionId: string): Promise<SessionView | n
       .select()
       .from(sessionExerciseNotes)
       .where(eq(sessionExerciseNotes.sessionId, sessionId)),
+    db
+      .select()
+      .from(sessionTips)
+      .where(eq(sessionTips.sessionId, sessionId)),
   ]);
 
   const exerciseViews = await Promise.all(
@@ -219,11 +260,31 @@ export async function getSessionView(sessionId: string): Promise<SessionView | n
           reps,
         }));
       const noteRow = notes.find((n) => n.exerciseId === rx.exerciseId);
-      const lastSession = await getLastSessionSetsForExercise(
+      // Two prior sessions: the latest drives the UI's "last time" panel, and
+      // the one before it supplies the weight tenure for the consolidation rule.
+      const prior = await getRecentPriorSessionsForExercise(
         rx.exerciseId,
-        sessionId
+        sessionId,
+        2
       );
-      return { ...rx, loggedSets, note: noteRow?.note ?? null, lastSession };
+      const lastSession = prior[0] ?? null;
+      const range = {
+        targetSets: rx.targetSets,
+        repMin: rx.repMin,
+        repMax: rx.repMax,
+      };
+      const readiness = readinessToIncrease(
+        prior.map((s) => summarizeExerciseSession(s.sets, range))
+      );
+      const tipRow = tips.find((t) => t.exerciseId === rx.exerciseId);
+      return {
+        ...rx,
+        loggedSets,
+        note: noteRow?.note ?? null,
+        lastSession,
+        readiness,
+        tip: tipRow?.tip ?? null,
+      };
     })
   );
 
@@ -241,6 +302,52 @@ export async function getSessionView(sessionId: string): Promise<SessionView | n
     programName: session.programName,
     exercises: exerciseViews,
   };
+}
+
+/** A stored pre-generated tip for one exercise of a session, if any. */
+export async function getSessionTip(
+  sessionId: string,
+  exerciseId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ tip: sessionTips.tip })
+    .from(sessionTips)
+    .where(
+      and(
+        eq(sessionTips.sessionId, sessionId),
+        eq(sessionTips.exerciseId, exerciseId)
+      )
+    );
+  return row?.tip ?? null;
+}
+
+/**
+ * The athlete's most recent note on an exercise from any PRIOR session — the
+ * "note to self" the coach tip should read back next time.
+ */
+export async function getLatestExerciseNote(
+  exerciseId: string,
+  excludeSessionId: string
+): Promise<{ note: string; performedAt: Date } | null> {
+  const [row] = await db
+    .select({
+      note: sessionExerciseNotes.note,
+      performedAt: workoutSessions.performedAt,
+    })
+    .from(sessionExerciseNotes)
+    .innerJoin(
+      workoutSessions,
+      eq(sessionExerciseNotes.sessionId, workoutSessions.id)
+    )
+    .where(
+      and(
+        eq(sessionExerciseNotes.exerciseId, exerciseId),
+        ne(sessionExerciseNotes.sessionId, excludeSessionId)
+      )
+    )
+    .orderBy(desc(workoutSessions.performedAt))
+    .limit(1);
+  return row ?? null;
 }
 
 export type ExerciseHistoryPoint = {
@@ -490,6 +597,34 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
     session.sets.push({ weightKg: r.weightKg, reps: r.reps });
   }
 
+  // Latest athlete note per exercise — free-text session notes are the athlete
+  // talking to the coach ("shoulder felt off"), so the brief carries them.
+  const noteRows = await db
+    .select({
+      exerciseId: sessionExerciseNotes.exerciseId,
+      note: sessionExerciseNotes.note,
+      performedAt: workoutSessions.performedAt,
+    })
+    .from(sessionExerciseNotes)
+    .innerJoin(
+      workoutSessions,
+      eq(sessionExerciseNotes.sessionId, workoutSessions.id)
+    )
+    .where(eq(workoutSessions.programId, program.id))
+    .orderBy(desc(workoutSessions.performedAt));
+  const latestNoteByExercise = new Map<
+    string,
+    { note: string; performedAt: Date }
+  >();
+  for (const n of noteRows) {
+    if (!latestNoteByExercise.has(n.exerciseId)) {
+      latestNoteByExercise.set(n.exerciseId, {
+        note: n.note,
+        performedAt: n.performedAt,
+      });
+    }
+  }
+
   const exerciseSnapshots: ExerciseSnapshot[] = Array.from(
     byExercise,
     ([exerciseId, p]): ExerciseSnapshot => ({
@@ -499,6 +634,7 @@ export async function getCoachingInput(): Promise<CoachingSnapshot | null> {
       isBodyweightPlus: p.isBodyweightPlus,
       rx: { targetSets: p.targetSets, repMin: p.repMin, repMax: p.repMax },
       sessions: sessionsByExercise.get(exerciseId) ?? [],
+      lastNote: latestNoteByExercise.get(exerciseId) ?? null,
     })
   );
 

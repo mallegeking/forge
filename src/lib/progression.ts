@@ -71,6 +71,46 @@ export function summarizeExerciseSession(
   };
 }
 
+// --- Consolidation-aware readiness -------------------------------------------
+//
+// "Reps first, then weight" alone proved too eager: one good session at a new
+// weight immediately produced READY, so every improvement was chased by "add
+// more". The athlete asked for safe progress (2026-07-15): a new weight must
+// be HELD for at least two sessions before the next increase. Topping the
+// range on the very first session at a weight is a strong start — the answer
+// is "confirm it once more", not "add load".
+
+export type Readiness = "first" | "building" | "consolidate" | "ready";
+
+/**
+ * Readiness to add weight, judged over recent sessions of one exercise.
+ *
+ * - `first` — no history yet; establish a working weight.
+ * - `building` — latest session didn't top the rep range; keep chasing reps.
+ * - `consolidate` — latest session topped the range, but this is the first
+ *   session at this weight; confirm it once more before adding load.
+ * - `ready` — topped the range after ≥2 consecutive sessions at this weight.
+ *
+ * @param summaries Sessions for one exercise, most-recent-first, deload
+ *   sessions excluded (their planned lighter load would reset the tenure).
+ */
+export function readinessToIncrease(
+  summaries: ExerciseSessionSummary[]
+): Readiness {
+  if (summaries.length === 0) return "first";
+  const latest = summaries[0];
+  if (!latest.hitTopOfRange) return "building";
+  let tenure = 1;
+  for (
+    let i = 1;
+    i < summaries.length && summaries[i].weightKg === latest.weightKg;
+    i++
+  ) {
+    tenure += 1;
+  }
+  return tenure >= 2 ? "ready" : "consolidate";
+}
+
 export type PlateauResult = {
   isPlateau: boolean;
   /** The stuck weight, when a plateau is detected. */

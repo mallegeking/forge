@@ -3,6 +3,7 @@ import {
   restSecondsFor,
   suggestIncrement,
   isReadyToIncrease,
+  readinessToIncrease,
   allSetsHitTop,
   topSetWeight,
   detectPlateau,
@@ -56,6 +57,42 @@ describe("isReadyToIncrease / allSetsHitTop", () => {
   it("not ready with no sets", () => {
     expect(isReadyToIncrease([], rx)).toBe(false);
     expect(allSetsHitTop([], rx)).toBe(false);
+  });
+});
+
+describe("readinessToIncrease (consolidation rule)", () => {
+  // summaries are most-recent-first
+  const s = (weightKg: number, hitTopOfRange: boolean) => ({
+    weightKg,
+    hitTopOfRange,
+  });
+
+  it("is 'first' with no history", () => {
+    expect(readinessToIncrease([])).toBe("first");
+  });
+
+  it("is 'building' when the latest session misses the top", () => {
+    expect(readinessToIncrease([s(50, false), s(50, true)])).toBe("building");
+  });
+
+  it("is 'consolidate' when the FIRST session at a weight tops the range", () => {
+    expect(readinessToIncrease([s(50, true), s(47.5, true)])).toBe("consolidate");
+    // No prior session at all counts as first-at-this-weight too.
+    expect(readinessToIncrease([s(50, true)])).toBe("consolidate");
+  });
+
+  it("is 'ready' once the weight was held for 2+ sessions and tops the range", () => {
+    expect(readinessToIncrease([s(50, true), s(50, false)])).toBe("ready");
+    expect(readinessToIncrease([s(50, true), s(50, true), s(47.5, true)])).toBe(
+      "ready"
+    );
+  });
+
+  it("weight tenure counts only the consecutive run at the latest weight", () => {
+    // 50 → back down to 47.5 → back up to 50: the return to 50 starts over.
+    expect(readinessToIncrease([s(50, true), s(47.5, true), s(50, true)])).toBe(
+      "consolidate"
+    );
   });
 });
 

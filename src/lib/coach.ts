@@ -13,7 +13,7 @@ import {
   type RepRange,
   summarizeExerciseSession,
   detectPlateau,
-  isReadyToIncrease,
+  readinessToIncrease,
   suggestIncrement,
 } from "./progression";
 
@@ -33,6 +33,8 @@ export type ExerciseSnapshot = {
   rx: RepRange;
   /** Most-recent session first. Exercises with no history are dropped. */
   sessions: SnapshotSession[];
+  /** The athlete's most recent free-text note on this exercise, if any. */
+  lastNote?: { note: string; performedAt: Date } | null;
 };
 
 export type CoachingSnapshot = {
@@ -59,15 +61,18 @@ export const COACH_SYSTEM_PROMPT = `You are Forge, the strength coach built into
 
 The app follows one progression rule, and so do you:
 1. Reps first: aim to hit the TOP of the prescribed rep range on every working set.
-2. Then weight: once every set reaches the top in a session, add load next time — compound lifts +2.5–5 kg, isolation +1–2.5 kg. Reps drop, then you climb the range again.
+2. Consolidate: a new weight is held for at least TWO sessions. Topping the range on the very first session at a weight means "confirm it once more next time", not "add load".
+3. Then weight: once the range is topped after ≥2 sessions at that weight, add load next time — compound lifts +2.5–5 kg, isolation +1–2.5 kg. Reps drop, then you climb the range again.
 Every 4th training week is a deload — lighter loads and volume to recover.
 
-You will be given the athlete's current data: the active program, the training week, and recent sessions per exercise with progression flags already computed (READY to add weight, PLATEAU, or still building reps).
+You will be given the athlete's current data: the active program, the training week, and recent sessions per exercise with progression flags already computed (READY to add weight, CONSOLIDATE at the current weight, PLATEAU, or still building reps).
 
 How to coach:
 - Ground every claim in the data provided. Never invent sessions, weights, or reps that aren't there. If history is thin, say so and give general guidance.
 - Be specific and prescriptive: name the exercise and give concrete kg numbers ("add 2.5 kg to your top set of Bench Press").
+- On CONSOLIDATE, never prescribe more weight — the goal is repeating the same load with the same (or cleaner) reps. Frame it positively: locking the weight in IS the progress.
 - Honor injury notes — if an exercise is flagged, account for it and suggest caution or alternatives rather than just pushing load.
+- Honor the athlete's own session notes when provided (e.g. "shoulder felt off", "grip gave out first") — adjust the advice to what they told you, and acknowledge it briefly so they know it was read.
 - On a PLATEAU, don't just say "add weight". Suggest a real break: a small double-progression nudge, a back-off set, a brief deload, rep-quality focus, or a swap.
 - During a deload week, hold load back — do not tell the athlete to add weight.
 - Keep it concise and skimmable (this is a phone). Lead with what matters most. Use short paragraphs or tight bullets. Warm, direct, no filler.
@@ -108,22 +113,28 @@ function formatExercise(ex: ExerciseSnapshot): string {
     .join("; ");
 
   // Progression flags, computed with the same functions the session UI uses.
-  const latest = sessions[0];
   const summaries = sessions.map((s) => summarizeExerciseSession(s.sets, rx));
   const plateau = detectPlateau(summaries);
-  const ready = isReadyToIncrease(latest.sets, rx);
+  const readiness = readinessToIncrease(summaries);
   const inc = suggestIncrement(ex.type);
+  const topWeight = summaries[0]?.weightKg ?? 0;
 
   let status: string;
-  if (ready) {
+  if (readiness === "ready") {
     status = `READY to add weight (+${inc.min}–${inc.max}kg next session).`;
+  } else if (readiness === "consolidate") {
+    status = `CONSOLIDATE — topped the range on the FIRST session at ${ex.isBodyweightPlus ? "+" : ""}${topWeight}kg; confirm this weight once more before adding load.`;
   } else if (plateau.isPlateau) {
     status = `PLATEAU — ${plateau.consecutive} sessions stuck at ${plateau.weightKg}kg without topping the rep range.`;
   } else {
     status = `Building reps toward the top of the range.`;
   }
 
-  return `- ${header}\n    Recent (newest first): ${recent}\n    Status: ${status}`;
+  const note = ex.lastNote
+    ? `\n    Athlete's note (${isoDate(ex.lastNote.performedAt)}): "${ex.lastNote.note}"`
+    : "";
+
+  return `- ${header}\n    Recent (newest first): ${recent}\n    Status: ${status}${note}`;
 }
 
 /**
@@ -153,20 +164,72 @@ export function buildCoachingBrief(snap: CoachingSnapshot): string {
 // ONE exercise and capped to 1–2 sentences. The DB gather + streaming call live
 // in the /api/coach/tip route; this stays pure.
 
-export const COACH_TIP_SYSTEM_PROMPT = `You are Forge, the strength coach built into the athlete's training app, speaking to them mid-workout as they start one exercise.
-
-The app's progression rule (yours too):
+const TIP_SHARED_RULES = `The app's progression rule (yours too):
 1. Reps first: hit the TOP of the prescribed rep range on every working set.
-2. Then weight: once every set tops out, add load next time — compound +2.5–5 kg, isolation +1–2.5 kg.
+2. Consolidate: a new weight is held for at least TWO sessions — topping the range on the first session at a weight means "confirm it next time", never "add load".
+3. Then weight: once the range is topped after ≥2 sessions at that weight, add load next time — compound +2.5–5 kg, isolation +1–2.5 kg.
 Every 4th training week is a deload — lighter, don't add load.
 
-You'll be given this ONE exercise's prescription, its recent sessions (with a progression flag already computed), and any sets already logged today. Give ONE concrete, actionable cue for THIS exercise, right now.
-
-Rules:
-- 1–2 short sentences, ~30 words max. No greeting, no preamble, no sign-off. Plain prose only — never use the [[lift|…]] card syntax.
+Tip rules:
+- 1–2 short sentences, ~30 words max per tip. No greeting, no preamble, no sign-off. Plain prose only — never use the [[lift|…]] card syntax.
 - Be specific with kg/reps drawn from the data. Never invent numbers; if there's no history, say so and give a sensible starting cue.
-- READY → name the exact target load. PLATEAU → suggest a real break (pause reps, a back-off set, rep-quality focus, a small nudge), not just "add weight". Building → focus on hitting the top of the rep range.
-- Honor the injury note if present. On a deload week, keep it light — don't push load.`;
+- READY → name the exact target load. CONSOLIDATE → prescribe repeating the SAME load, framed as locking it in — never more weight. PLATEAU → suggest a real break (pause reps, a back-off set, rep-quality focus, a small nudge), not just "add weight". Building → focus on hitting the top of the rep range.
+- Honor the injury note if present. If the athlete left a note last session ("shoulder felt off"), address it — that note is them talking to you.
+- On a deload week, keep it light — don't push load.`;
+
+export const COACH_TIP_SYSTEM_PROMPT = `You are Forge, the strength coach built into the athlete's training app, speaking to them mid-workout as they start one exercise.
+
+${TIP_SHARED_RULES}
+
+You'll be given this ONE exercise's prescription, its recent sessions (with a progression flag already computed), and any sets already logged today. Give ONE concrete, actionable cue for THIS exercise, right now.`;
+
+// --- Batched pre-generation (all tips at session start) ----------------------
+//
+// One model call generates every exercise's tip when a session begins, so tips
+// are already waiting when the athlete reaches each exercise — and one call
+// instead of N respects the provider's free-tier rate limits. Output protocol:
+// strictly one numbered line per exercise, parsed by `parseSessionTips`.
+
+export const COACH_TIPS_BATCH_SYSTEM_PROMPT = `You are Forge, the strength coach built into the athlete's training app. The athlete is about to start a workout; you write one short cue for EACH exercise on today's plan.
+
+${TIP_SHARED_RULES}
+
+You'll be given the numbered list of today's exercises, each with its prescription, recent sessions and a progression flag already computed.
+
+Output format — follow it exactly:
+- Reply with exactly one line per exercise: the exercise's number, a period, a space, then the tip. Example: "2. Same 50 kg as last time — make all three sets of 12 clean to lock it in."
+- Keep the exercises in the given order, one line each, no extra lines, no headers, no blank lines, no other text.`;
+
+/** Numbered multi-exercise brief for the batched session-start generation. */
+export function buildSessionTipsBrief(inputs: ExerciseTipInput[]): string {
+  const blocks = inputs.map((input, i) => {
+    // Reuse the single-tip brief, minus its trailing instruction line.
+    const single = buildExerciseTipBrief(input).replace(
+      /\n\nGive one cue for this exercise now\.$/,
+      ""
+    );
+    return `${i + 1}. ${single}`;
+  });
+  return `Today's exercises:\n\n${blocks.join("\n\n")}\n\nGive one cue per exercise, numbered 1–${inputs.length}.`;
+}
+
+/**
+ * Parse the batch reply back into per-exercise tips. Tolerant of model drift:
+ * unnumbered/extra lines are ignored, missing numbers stay null (the live
+ * per-exercise endpoint fills those on demand). First occurrence wins.
+ */
+export function parseSessionTips(text: string, count: number): (string | null)[] {
+  const tips: (string | null)[] = Array.from({ length: count }, () => null);
+  for (const raw of text.split("\n")) {
+    const m = raw.trim().match(/^(\d{1,2})[.)]\s+(.+)$/);
+    if (!m) continue;
+    const idx = Number.parseInt(m[1], 10) - 1;
+    if (idx >= 0 && idx < count && tips[idx] === null) {
+      tips[idx] = m[2].trim();
+    }
+  }
+  return tips;
+}
 
 /** One prior session of an exercise, condensed (matches getExerciseHistory points). */
 export type ExerciseTipSession = {
@@ -188,6 +251,8 @@ export type ExerciseTipInput = {
   recent: ExerciseTipSession[];
   /** Sets already logged for this exercise in the CURRENT session (may be empty). */
   currentSets: LoggedSet[];
+  /** The athlete's most recent prior free-text note on this exercise, if any. */
+  lastNote?: { note: string; performedAt: Date } | null;
 };
 
 /** A focused, single-exercise brief for the live coach tip — pure over its input. */
@@ -213,6 +278,7 @@ export function buildExerciseTipBrief(input: ExerciseTipInput): string {
     hitTopOfRange: s.hitTopOfRange,
   }));
   const plateau = detectPlateau(summaries);
+  const readiness = readinessToIncrease(summaries);
   const last = recent[0];
   const inc = suggestIncrement(input.type);
 
@@ -222,8 +288,10 @@ export function buildExerciseTipBrief(input: ExerciseTipInput): string {
   } else if (!last) {
     status =
       "First time logged here — establish a working weight and aim for the top of the rep range.";
-  } else if (last.hitTopOfRange) {
+  } else if (readiness === "ready") {
     status = `READY to add weight: +${inc.min}–${inc.max}kg over ${pre}${last.topWeightKg}kg.`;
+  } else if (readiness === "consolidate") {
+    status = `CONSOLIDATE — topped the range on the FIRST session at ${pre}${last.topWeightKg}kg; repeat this weight to lock it in before adding load.`;
   } else if (plateau.isPlateau) {
     status = `PLATEAU — ${plateau.consecutive} sessions stuck at ${pre}${plateau.weightKg}kg without topping the rep range.`;
   } else {
@@ -231,13 +299,17 @@ export function buildExerciseTipBrief(input: ExerciseTipInput): string {
       "Building reps toward the top of the range — match or beat last time's reps.";
   }
 
+  const note = input.lastNote
+    ? `\nAthlete's note (${isoDate(input.lastNote.performedAt)}): "${input.lastNote.note}"`
+    : "";
+
   const current = input.currentSets.length
     ? `\nLogged so far today: ${input.currentSets
         .map((s) => `${pre}${s.weightKg}kg×${s.reps}`)
         .join(", ")}.`
     : "";
 
-  return `Exercise: ${header}\nRecent (newest first): ${recentLine}\nStatus: ${status}${current}\n\nGive one cue for this exercise now.`;
+  return `Exercise: ${header}\nRecent (newest first): ${recentLine}\nStatus: ${status}${note}${current}\n\nGive one cue for this exercise now.`;
 }
 
 // --- Proactive coach's note ------------------------------------------------
@@ -274,15 +346,16 @@ export function buildCoachNote(snap: CoachingSnapshot): CoachNote | null {
 
   for (const ex of snap.exercises) {
     if (ex.sessions.length === 0) continue;
-    const latest = ex.sessions[0];
-    if (isReadyToIncrease(latest.sets, ex.rx)) {
+    const summaries = ex.sessions.map((s) =>
+      summarizeExerciseSession(s.sets, ex.rx),
+    );
+    // Consolidation-aware: a first session at a new weight that tops the range
+    // is NOT "ready" — the note stays quiet about it (confirm first).
+    if (readinessToIncrease(summaries) === "ready") {
       const inc = suggestIncrement(ex.type);
       ready.push({ name: ex.name, incMin: inc.min, incMax: inc.max });
       continue;
     }
-    const summaries = ex.sessions.map((s) =>
-      summarizeExerciseSession(s.sets, ex.rx),
-    );
     const p = detectPlateau(summaries);
     if (p.isPlateau) plateau.push({ name: ex.name, sessions: p.consecutive });
   }

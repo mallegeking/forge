@@ -28,7 +28,16 @@ export function coachErrorResponse(err: unknown): Response {
 
 export async function coachStreamResponse(
   stream: AsyncGenerator<string>,
-  { logTag, midStreamText }: { logTag: string; midStreamText: string }
+  {
+    logTag,
+    midStreamText,
+    onComplete,
+  }: {
+    logTag: string;
+    midStreamText: string;
+    /** Called with the full text after a fully successful stream (not on mid-stream failure). */
+    onComplete?: (fullText: string) => Promise<void> | void;
+  }
 ): Promise<Response> {
   let first: IteratorResult<string, void>;
   try {
@@ -41,12 +50,24 @@ export async function coachStreamResponse(
   const encoder = new TextEncoder();
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let fullText = "";
       try {
-        if (!first.done) controller.enqueue(encoder.encode(first.value));
+        if (!first.done) {
+          fullText += first.value;
+          controller.enqueue(encoder.encode(first.value));
+        }
         for (let next = await stream.next(); !next.done; next = await stream.next()) {
+          fullText += next.value;
           controller.enqueue(encoder.encode(next.value));
         }
         controller.close();
+        if (onComplete) {
+          try {
+            await onComplete(fullText);
+          } catch (err) {
+            console.error(`[${logTag}] onComplete failed`, err);
+          }
+        }
       } catch (err) {
         // The 200 headers are already sent — degrade in-band.
         console.error(`[${logTag}] mid-stream error`, err);

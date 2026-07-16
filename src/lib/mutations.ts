@@ -7,6 +7,7 @@ import {
   workoutSessions,
   setLogs,
   sessionExerciseNotes,
+  sessionTips,
   settings,
   bodyweightLogs,
   progressPhotos,
@@ -237,6 +238,24 @@ export async function upsertExerciseNote({
       note: trimmed,
     });
   }
+}
+
+/**
+ * Store a pre-generated coach tip for one exercise of a session (overwrites an
+ * existing one — the athlete's explicit "retry" regenerates in place).
+ */
+export async function saveSessionTip(
+  sessionId: string,
+  exerciseId: string,
+  tip: string
+) {
+  await db
+    .insert(sessionTips)
+    .values({ id: nanoid(), sessionId, exerciseId, tip })
+    .onConflictDoUpdate({
+      target: [sessionTips.sessionId, sessionTips.exerciseId],
+      set: { tip, createdAt: new Date() },
+    });
 }
 
 // --- Program editor: prescriptions (which exercises a day contains) ---

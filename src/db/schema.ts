@@ -143,6 +143,29 @@ export const sessionExerciseNotes = sqliteTable(
   })
 );
 
+// Pre-generated per-exercise AI coach tips for a session. Written once at
+// session start (batched model call) or on first demand, then served from here
+// — so a reload never re-asks the model and never burns provider quota.
+export const sessionTips = sqliteTable(
+  "session_tips",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => workoutSessions.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id")
+      .notNull()
+      .references(() => exercises.id),
+    tip: text("tip").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    sessionExerciseUnique: unique().on(table.sessionId, table.exerciseId),
+  })
+);
+
 // Simple key/value app state — e.g. trainingStartDate (when week counting began).
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
@@ -183,5 +206,6 @@ export type ProgramDayExercise = typeof programDayExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
 export type SessionExerciseNote = typeof sessionExerciseNotes.$inferSelect;
+export type SessionTip = typeof sessionTips.$inferSelect;
 export type BodyweightLog = typeof bodyweightLogs.$inferSelect;
 export type ProgressPhoto = typeof progressPhotos.$inferSelect;

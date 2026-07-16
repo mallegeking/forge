@@ -24,7 +24,8 @@ import {
 } from "lucide-react";
 import {
   deloadAdjust,
-  isReadyToIncrease,
+  readinessToIncrease,
+  summarizeExerciseSession,
   suggestIncrement,
   type RepRange,
 } from "@/lib/progression";
@@ -248,19 +249,33 @@ export function SessionView({
   // Which logged set (if any) is currently open in the inline editor.
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
 
-  // Proactive AI coach tip per exercise, keyed by exerciseId. Fetched once when
-  // you land on an exercise and cached (state + sessionStorage) so back-nav and
-  // reloads don't re-bill the model. `tipState` tracks loading vs off (no
-  // provider) vs error (transient failure — retryable, never cached) so the
-  // card can fall back to its rule-based line.
-  const [tips, setTips] = useState<Record<string, string>>({});
+  // Proactive AI coach tip per exercise, keyed by exerciseId. Tips are
+  // pre-generated at session start and stored server-side (session_tips), so
+  // most arrive with the page; the endpoint fills gaps on demand and persists
+  // them, which is why reloads never re-bill the model. `tipState` tracks
+  // loading vs off (no provider) vs error (transient failure — retryable,
+  // never cached) so the card can fall back to its rule-based line.
+  const [tips, setTips] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      exercises.filter((e) => e.tip).map((e) => [e.exerciseId, e.tip!])
+    )
+  );
   const [tipState, setTipState] = useState<
     Record<string, "loading" | "done" | "off" | "error">
-  >({});
+  >(() =>
+    Object.fromEntries(
+      exercises.filter((e) => e.tip).map((e) => [e.exerciseId, "done" as const])
+    )
+  );
   // Bumping this refetches the current exercise's tip (the "Retry" button).
   const [tipNonce, setTipNonce] = useState(0);
-  const tipLoaded = useRef<Set<string>>(new Set());
+  const tipLoaded = useRef<Set<string>>(
+    new Set(exercises.filter((e) => e.tip).map((e) => e.exerciseId))
+  );
   const tipInFlight = useRef<Set<string>>(new Set());
+  // Set to an exerciseId by "Retry": the next fetch asks the server to
+  // regenerate instead of returning the stored tip.
+  const freshTipFor = useRef<string | null>(null);
 
   // --- Mutations ------------------------------------------------------------
   const moveTo = useCallback(
@@ -396,10 +411,18 @@ export function SessionView({
       const prevBest = e.lastSession
         ? Math.max(...e.lastSession.sets.map((s) => s.weightKg))
         : 0;
-      const ready = isReadyToIncrease(
-        sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps })),
-        rxOf(e)
-      );
+      // Consolidation-aware: READY only when today topped the range at a
+      // weight already confirmed last session (a fresh weight shows PR/HELD).
+      const summaries = [
+        summarizeExerciseSession(
+          sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps })),
+          rxOf(e)
+        ),
+        ...(e.lastSession
+          ? [summarizeExerciseSession(e.lastSession.sets, rxOf(e))]
+          : []),
+      ];
+      const ready = readinessToIncrease(summaries) === "ready";
 
       if (e.lastSession && bestW > prevBest) {
         const bestSet = sets
@@ -465,22 +488,17 @@ export function SessionView({
     });
   }, [notes, ex, view.session.id, startTransition]);
 
-  // Fetch the per-exercise coach tip when the current exercise changes, with
-  // state + sessionStorage caching so navigating back or reloading is free.
+  // Fetch the per-exercise coach tip when the current exercise changes. Tips
+  // pre-generated at session start arrive with the page (state is seeded
+  // above); this only fires for gaps, and the server stores what it generates,
+  // so navigating back or reloading is free.
   const exerciseId = ex.exerciseId;
   useEffect(() => {
-    const key = `coachtip:${view.session.id}:${exerciseId}`;
     if (tipLoaded.current.has(exerciseId)) return;
-    const cached =
-      typeof window !== "undefined" ? window.sessionStorage.getItem(key) : null;
-    if (cached != null) {
-      tipLoaded.current.add(exerciseId);
-      setTips((p) => ({ ...p, [exerciseId]: cached }));
-      setTipState((p) => ({ ...p, [exerciseId]: "done" }));
-      return;
-    }
     if (tipInFlight.current.has(exerciseId)) return;
     tipInFlight.current.add(exerciseId);
+    const fresh = freshTipFor.current === exerciseId;
+    freshTipFor.current = null;
 
     let aborted = false;
     const controller = new AbortController();
@@ -490,7 +508,7 @@ export function SessionView({
         const res = await fetch("/api/coach/tip", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: view.session.id, exerciseId }),
+          body: JSON.stringify({ sessionId: view.session.id, exerciseId, fresh }),
           signal: controller.signal,
         });
         // 503 = no provider configured — permanently off, rule-based line only.
@@ -529,11 +547,6 @@ export function SessionView({
           setTips((p) => ({ ...p, [exerciseId]: text }));
           setTipState((p) => ({ ...p, [exerciseId]: text ? "done" : "off" }));
           tipLoaded.current.add(exerciseId);
-          try {
-            window.sessionStorage.setItem(key, text);
-          } catch {
-            // sessionStorage may be unavailable (private mode) — non-fatal.
-          }
         }
       } catch {
         // Aborted (exercise changed) or network error — show a retry so the
@@ -550,19 +563,15 @@ export function SessionView({
     };
   }, [exerciseId, view.session.id, tipNonce]);
 
-  // Retry a failed tip fetch: clear every cache layer for this exercise and
-  // re-run the effect above.
+  // Retry a failed tip fetch: clear the cached state for this exercise and
+  // re-run the effect above, asking the server to regenerate (skip its store).
   const retryTip = useCallback(() => {
-    try {
-      window.sessionStorage.removeItem(`coachtip:${view.session.id}:${exerciseId}`);
-    } catch {
-      // non-fatal
-    }
+    freshTipFor.current = exerciseId;
     tipLoaded.current.delete(exerciseId);
     setTips((p) => ({ ...p, [exerciseId]: "" }));
     setTipState((p) => ({ ...p, [exerciseId]: "loading" }));
     setTipNonce((n) => n + 1);
-  }, [exerciseId, view.session.id]);
+  }, [exerciseId]);
 
   // --- Receipt screen -------------------------------------------------------
   if (screen === "done" && receipt) {
@@ -613,9 +622,15 @@ export function SessionView({
       const target = Math.max(0, Math.round((top * factor) / 2.5) * 2.5);
       return { kind: "hold" as const, target, inc: 0 };
     }
-    if (isReadyToIncrease(lastSets, rxOf(ex))) {
+    // Consolidation-aware readiness, computed server-side over the prior two
+    // sessions: a first session at a new weight that topped the range reads
+    // "confirm this weight" instead of immediately prescribing more.
+    if (ex.readiness === "ready") {
       const inc = suggestIncrement(ex.type);
       return { kind: "ready" as const, target: top + inc.min, inc: inc.min };
+    }
+    if (ex.readiness === "consolidate") {
+      return { kind: "consolidate" as const, target: top, inc: 0 };
     }
     return { kind: "hold" as const, target: top, inc: 0 };
   })();
@@ -750,14 +765,20 @@ export function SessionView({
             </span>
             <span
               className={`ml-auto font-display text-[12px] font-semibold tracking-[0.08em] uppercase ${
-                anchor.kind === "ready" ? "text-success" : "text-muted-foreground"
+                anchor.kind === "ready"
+                  ? "text-success"
+                  : anchor.kind === "consolidate"
+                    ? "text-primary"
+                    : "text-muted-foreground"
               }`}
             >
               {anchor.kind === "ready"
                 ? `${t.session.coachReady} · +${formatWeight(anchor.inc)} ${t.session.kg}`
-                : anchor.kind === "first"
-                  ? t.session.coachFirstTime
-                  : t.session.coachHold}
+                : anchor.kind === "consolidate"
+                  ? t.session.coachConsolidate
+                  : anchor.kind === "first"
+                    ? t.session.coachFirstTime
+                    : t.session.coachHold}
             </span>
           </div>
           {anchor.target != null && (

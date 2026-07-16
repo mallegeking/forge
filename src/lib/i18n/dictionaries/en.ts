@@ -356,6 +356,7 @@ export const en = {
     coachTipError: "Couldn't reach the coach.",
     coachTarget: "Target today",
     coachReady: "Ready",
+    coachConsolidate: "Confirm weight",
     coachHold: "Hold",
     coachPlateau: "Plateau",
     coachFirstTime: "First time",

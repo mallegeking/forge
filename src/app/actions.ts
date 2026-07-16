@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { AUTH_COOKIE, checkPasscode, sessionToken } from "@/lib/auth";
 import {
   startOrResumeSession,
@@ -37,8 +38,10 @@ import {
   deleteProgressPhoto,
 } from "@/lib/mutations";
 import { LOCALE_COOKIE, isLocale } from "@/lib/i18n/config";
+import { getLocale } from "@/lib/i18n/server";
 import { getCoachProvider } from "@/lib/coach-config";
 import { streamCoach } from "@/lib/coach-stream";
+import { pregenerateSessionTips } from "@/lib/session-tips";
 import { deletePhotoFile } from "@/lib/photo-storage";
 import type { ExerciseType } from "@/db/schema";
 
@@ -88,6 +91,12 @@ export async function setLocaleAction(locale: string) {
 export async function startSessionAction(formData: FormData) {
   const dayId = String(formData.get("dayId") ?? "");
   const sessionId = await startOrResumeSession(dayId);
+  // Pre-generate every exercise's coach tip in ONE batched model call, after
+  // the redirect response is sent — tips are waiting by the time the athlete
+  // reaches each exercise. Locale is resolved here because request APIs
+  // aren't available inside after(). Failures are swallowed inside.
+  const locale = await getLocale();
+  after(() => pregenerateSessionTips(sessionId, locale));
   redirect(`/session/${sessionId}`);
 }
 

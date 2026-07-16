@@ -358,6 +358,7 @@ export const de: Dictionary = {
     coachTipError: "Coach nicht erreichbar.",
     coachTarget: "Heutiges Ziel",
     coachReady: "Bereit",
+    coachConsolidate: "Gewicht bestätigen",
     coachHold: "Halten",
     coachPlateau: "Plateau",
     coachFirstTime: "Erstes Mal",
