@@ -15,6 +15,8 @@ import {
   detectPlateau,
   readinessToIncrease,
   suggestIncrement,
+  deloadAdjust,
+  deloadTargetWeightKg,
 } from "./progression";
 
 /** One past session of an exercise, condensed to its logged sets. */
@@ -175,7 +177,7 @@ Tip rules:
 - Be specific with kg/reps drawn from the data. Never invent numbers; if there's no history, say so and give a sensible starting cue.
 - READY → name the exact target load. CONSOLIDATE → prescribe repeating the SAME load, framed as locking it in — never more weight. PLATEAU → suggest a real break (pause reps, a back-off set, rep-quality focus, a small nudge), not just "add weight". Building → focus on hitting the top of the rep range.
 - Honor the injury note if present. If the athlete left a note last session ("shoulder felt off"), address it — that note is them talking to you.
-- On a deload week, keep it light — don't push load.`;
+- On a deload week the data states today's reduced target (weight and sets). Prescribe exactly that target — never the normal working weight, even though it appears in the recent history.`;
 
 export const COACH_TIP_SYSTEM_PROMPT = `You are Forge, the strength coach built into the athlete's training app, speaking to them mid-workout as they start one exercise.
 
@@ -259,8 +261,11 @@ export type ExerciseTipInput = {
 export function buildExerciseTipBrief(input: ExerciseTipInput): string {
   const pre = input.isBodyweightPlus ? "+" : "";
   const rx = input.rx;
+  // On a deload the header shows the adjusted prescription (halved sets) —
+  // the same numbers the session card renders, so the model can't contradict it.
+  const effSets = input.isDeload ? deloadAdjust(rx).targetSets : rx.targetSets;
   const header =
-    `${input.name} (${input.type}${input.isBodyweightPlus ? ", bodyweight + added load" : ""}, target ${rx.targetSets}×${rx.repMin}–${rx.repMax})` +
+    `${input.name} (${input.type}${input.isBodyweightPlus ? ", bodyweight + added load" : ""}, target ${effSets}×${rx.repMin}–${rx.repMax})` +
     (input.injuryNote ? ` [injury: ${input.injuryNote}]` : "");
 
   const recent = input.recent.slice(0, MAX_SESSIONS_PER_EXERCISE);
@@ -284,7 +289,12 @@ export function buildExerciseTipBrief(input: ExerciseTipInput): string {
 
   let status: string;
   if (input.isDeload) {
-    status = "DELOAD week — keep the load light; do not push for more weight.";
+    // Quote the app's computed deload target (same helper the session card
+    // uses) — without it the model would "stick to" the full working weight,
+    // contradicting the "Target today" line rendered right above the tip.
+    status = last
+      ? `DELOAD week — today's target: ${pre}${deloadTargetWeightKg(last.topWeightKg)}kg (~60% of the usual ${pre}${last.topWeightKg}kg) for ${effSets}×${rx.repMin}–${rx.repMax}. Prescribe exactly this reduced load and set count — never the normal working weight.`
+      : "DELOAD week — keep the load light; do not push for more weight.";
   } else if (!last) {
     status =
       "First time logged here — establish a working weight and aim for the top of the rep range.";

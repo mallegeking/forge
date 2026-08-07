@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   deloadAdjust,
+  deloadTargetWeightKg,
   readinessToIncrease,
   summarizeExerciseSession,
   suggestIncrement,
@@ -152,7 +153,7 @@ export function SessionView({
       const fromHistory = e.lastSession?.sets[0]?.weightKg ?? 0;
       const weight =
         isDeload && fromHistory > 0
-          ? Math.round((fromHistory * deloadAdjust(rxOf(e)).loadFactor) / 2.5) * 2.5
+          ? deloadTargetWeightKg(fromHistory)
           : fromHistory;
       return { weight, reps: e.repMax };
     },
@@ -615,12 +616,9 @@ export function SessionView({
     const lastSets = last.sets.map((s) => ({ weightKg: s.weightKg, reps: s.reps }));
     const top = Math.max(...lastSets.map((s) => s.weightKg));
     if (isDeload) {
-      // Deload target ≈ 60% of the last normal top set, rounded like the
-      // stepper seed — the card must not prescribe full working weight on a
-      // recovery day.
-      const factor = deloadAdjust(rxOf(ex)).loadFactor;
-      const target = Math.max(0, Math.round((top * factor) / 2.5) * 2.5);
-      return { kind: "hold" as const, target, inc: 0 };
+      // Deload target ≈ 60% of the last normal top set — the card must not
+      // prescribe full working weight on a recovery day.
+      return { kind: "hold" as const, target: deloadTargetWeightKg(top), inc: 0 };
     }
     // Consolidation-aware readiness, computed server-side over the prior two
     // sessions: a first session at a new weight that topped the range reads

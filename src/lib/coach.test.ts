@@ -300,6 +300,27 @@ describe("buildExerciseTipBrief — consolidation + notes", () => {
     });
     expect(brief).toContain('"shoulder felt off"');
   });
+
+  // Regression: the deload tip used to say only "keep it light", so the model
+  // prescribed the full working weight from history ("stick to 30 kg") while
+  // the session card showed the computed 17.5 kg target right above it.
+  it("quotes the computed deload target weight and halved sets", () => {
+    const brief = buildExerciseTipBrief({
+      ...base,
+      rx: { targetSets: 4, repMin: 8, repMax: 10 },
+      isDeload: true,
+      recent: [rec(30, true, 7), rec(27.5, true, 9)],
+    });
+    expect(brief).toContain("DELOAD week — today's target: 17.5kg");
+    expect(brief).toContain("2×8–10"); // halved sets, in header and status
+    expect(brief).toContain("target 2×8–10"); // header shows adjusted rx
+    expect(brief).toContain("never the normal working weight");
+  });
+
+  it("keeps the generic deload cue when there is no history to anchor on", () => {
+    const brief = buildExerciseTipBrief({ ...base, isDeload: true });
+    expect(brief).toContain("DELOAD week — keep the load light");
+  });
 });
 
 describe("session tips batch protocol", () => {

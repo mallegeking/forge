@@ -153,13 +153,30 @@ async function* streamAnthropic(
   messages: CoachMessage[]
 ): AsyncGenerator<string> {
   const client = new Anthropic({ apiKey: provider.apiKey });
+  // Prompt caching: the system block (coach rules + training brief) is the
+  // shared prefix of every turn in a chat — with a breakpoint on it, turns 2+
+  // read it at ~0.1× input price instead of re-billing it whole. The second
+  // breakpoint on the last message extends the cached span across the growing
+  // conversation history. One-shot calls (tips) keep only the system marker,
+  // which lets the static tip prompt cache ACROSS calls. Below the model's
+  // minimum cacheable prefix (~1–2K tokens) the markers are silent no-ops.
+  const cachedMessages: Anthropic.MessageParam[] = messages.map((m, i) =>
+    i === messages.length - 1 && messages.length > 1
+      ? {
+          role: m.role,
+          content: [
+            { type: "text", text: m.content, cache_control: { type: "ephemeral" } },
+          ],
+        }
+      : m
+  );
   const stream = client.messages.stream({
     model: provider.model,
     max_tokens: MAX_TOKENS,
-    system,
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     thinking: { type: "adaptive" },
     output_config: { effort: "medium" },
-    messages,
+    messages: cachedMessages,
   });
   for await (const event of stream) {
     if (event.type === "content_block_delta" && event.delta.type === "text_delta") {

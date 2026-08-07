@@ -197,6 +197,8 @@ export type DeloadTarget = {
   loadFactor: number;
 };
 
+const DELOAD_LOAD_FACTOR = 0.6;
+
 /**
  * A deload week's prescription: roughly half the sets (rounded up) at a lighter
  * load, same rep range. Keeps recovery weeks structured rather than skipped.
@@ -206,8 +208,18 @@ export function deloadAdjust(rx: RepRange): DeloadTarget {
     targetSets: Math.max(1, Math.ceil(rx.targetSets / 2)),
     repMin: rx.repMin,
     repMax: rx.repMax,
-    loadFactor: 0.6,
+    loadFactor: DELOAD_LOAD_FACTOR,
   };
+}
+
+/**
+ * The deload day's suggested working weight: the load factor applied to the
+ * last normal top weight, rounded to the nearest 2.5 kg plate step. The single
+ * source for this number — the session card, the stepper seed, and the AI
+ * coach brief must all quote the same target.
+ */
+export function deloadTargetWeightKg(topWeightKg: number): number {
+  return Math.max(0, Math.round((topWeightKg * DELOAD_LOAD_FACTOR) / 2.5) * 2.5);
 }
 
 function startOfDay(d: Date): number {

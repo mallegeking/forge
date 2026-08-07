@@ -11,6 +11,7 @@ import {
   isDeloadWeek,
   resolveDeload,
   deloadAdjust,
+  deloadTargetWeightKg,
   type LoggedSet,
   type RepRange,
 } from "./progression";
@@ -181,5 +182,14 @@ describe("deloadAdjust", () => {
     });
     expect(deloadAdjust({ targetSets: 4, repMin: 5, repMax: 8 }).targetSets).toBe(2);
     expect(deloadAdjust({ targetSets: 1, repMin: 10, repMax: 12 }).targetSets).toBe(1);
+  });
+});
+
+describe("deloadTargetWeightKg", () => {
+  it("takes 60% of the top weight, rounded to the nearest 2.5kg step", () => {
+    expect(deloadTargetWeightKg(30)).toBe(17.5); // 18 → nearest plate step
+    expect(deloadTargetWeightKg(100)).toBe(60);
+    expect(deloadTargetWeightKg(42.5)).toBe(25);
+    expect(deloadTargetWeightKg(0)).toBe(0);
   });
 });
