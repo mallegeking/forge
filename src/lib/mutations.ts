@@ -300,6 +300,18 @@ export async function removePrescription(id: string) {
   await db.delete(programDayExercises).where(eq(programDayExercises.id, id));
 }
 
+/**
+ * Replace which exercise a prescription points at, keeping its slot in the
+ * day and its sets/rep range. Logged history stays with the old exercise —
+ * setLogs are keyed by exerciseId, not by prescription.
+ */
+export async function swapPrescriptionExercise(id: string, exerciseId: string) {
+  await db
+    .update(programDayExercises)
+    .set({ exerciseId })
+    .where(eq(programDayExercises.id, id));
+}
+
 /** Swap a prescription's order with its neighbour within the same day. */
 export async function reorderPrescription(id: string, direction: "up" | "down") {
   const [row] = await db

@@ -19,6 +19,7 @@ import {
   updatePrescription,
   removePrescription,
   reorderPrescription,
+  swapPrescriptionExercise,
   addProgramDay,
   renameDay,
   setDayOfWeek,
@@ -214,6 +215,14 @@ export async function reorderPrescriptionAction(input: {
   direction: "up" | "down";
 }) {
   await reorderPrescription(input.id, input.direction);
+  revalidateProgram();
+}
+
+export async function swapPrescriptionExerciseAction(input: {
+  id: string;
+  exerciseId: string;
+}) {
+  await swapPrescriptionExercise(input.id, input.exerciseId);
   revalidateProgram();
 }
 

@@ -21,11 +21,17 @@ export function ExercisePicker({
   library,
   existingIds,
   onDone,
+  onPick,
+  title,
 }: {
-  dayId: string;
+  dayId?: string;
   library: Exercise[];
   existingIds: Set<string>;
   onDone: () => void;
+  /** When set, selection is handed to the caller instead of adding to dayId. */
+  onPick?: (exerciseId: string) => Promise<void> | void;
+  /** Header label; defaults to "Add exercise". */
+  title?: string;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -40,11 +46,15 @@ export function ExercisePicker({
     (e) => !existingIds.has(e.id) && e.name.toLowerCase().includes(q)
   );
 
-  const add = (exerciseId: string) => {
-    startTransition(async () => {
+  const finish = async (exerciseId: string) => {
+    if (onPick) await onPick(exerciseId);
+    else if (dayId)
       await addExerciseToDayAction({ dayId, exerciseId, ...DEFAULT_RX });
-      onDone();
-    });
+    onDone();
+  };
+
+  const add = (exerciseId: string) => {
+    startTransition(() => finish(exerciseId));
   };
 
   const createAndAdd = () => {
@@ -57,8 +67,7 @@ export function ExercisePicker({
         defaultRestSeconds: restSecondsFor(newType),
         isBodyweightPlus: newPlus,
       });
-      await addExerciseToDayAction({ dayId, exerciseId: id, ...DEFAULT_RX });
-      onDone();
+      await finish(id);
     });
   };
 
@@ -66,7 +75,7 @@ export function ExercisePicker({
     <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {t.program.addExercise}
+          {title ?? t.program.addExercise}
         </span>
         <button
           type="button"

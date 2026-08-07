@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Archive,
+  ArrowLeftRight,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
@@ -20,11 +21,13 @@ import { Input } from "@/components/ui/input";
 import { useT } from "@/components/i18n/i18n-provider";
 import { ExercisePicker } from "@/components/program/exercise-picker";
 import type { DayExercise } from "@/lib/queries";
-import type { Program, ProgramDay, Exercise } from "@/db/schema";
+import type { Program, ProgramDay, Exercise, ExerciseType } from "@/db/schema";
 import {
   updatePrescriptionAction,
   removePrescriptionAction,
   reorderPrescriptionAction,
+  swapPrescriptionExerciseAction,
+  updateExerciseAction,
   addProgramDayAction,
   renameDayAction,
   setDayOfWeekAction,
@@ -423,6 +426,8 @@ function EditableDay({
             rx={ex}
             isFirst={i === 0}
             isLast={i === exercises.length - 1}
+            library={library}
+            existingIds={existingIds}
           />
         ))}
       </ul>
@@ -473,15 +478,20 @@ function PrescriptionRow({
   rx,
   isFirst,
   isLast,
+  library,
+  existingIds,
 }: {
   rx: DayExercise;
   isFirst: boolean;
   isLast: boolean;
+  library: Exercise[];
+  existingIds: Set<string>;
 }) {
   const t = useT();
   const [sets, setSets] = useState(rx.targetSets);
   const [lo, setLo] = useState(rx.repMin);
   const [hi, setHi] = useState(rx.repMax);
+  const [expanded, setExpanded] = useState(false);
   const [, startTransition] = useTransition();
 
   const commit = () => {
@@ -500,49 +510,186 @@ function PrescriptionRow({
     startTransition(() => void reorderPrescriptionAction({ id: rx.prescriptionId, direction }));
 
   return (
-    <li className="flex items-center gap-2 border-b border-border/60 px-4 py-2 last:border-b-0">
-      <div className="flex flex-col">
+    <li className="border-b border-border/60 last:border-b-0">
+      <div className="flex items-center gap-2 px-4 py-2">
+        <div className="flex flex-col">
+          <button
+            type="button"
+            aria-label={t.program.moveUp}
+            disabled={isFirst}
+            onClick={() => move("up")}
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+          >
+            <ChevronUp className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label={t.program.moveDown}
+            disabled={isLast}
+            onClick={() => move("down")}
+            className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+          >
+            <ChevronDown className="size-3.5" />
+          </button>
+        </div>
+
         <button
           type="button"
-          aria-label={t.program.moveUp}
-          disabled={isFirst}
-          onClick={() => move("up")}
-          className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+          aria-label={`${t.program.editExercise}: ${rx.name}`}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((e) => !e)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm"
         >
-          <ChevronUp className="size-3.5" />
+          <span className={`truncate ${expanded ? "text-primary" : ""}`}>{rx.name}</span>
+          <Pencil className="size-3 shrink-0 text-muted-foreground" />
         </button>
+
+        <div className="flex items-center gap-1 tabular-nums">
+          <NumberCell value={sets} onChange={setSets} onCommit={commit} label={t.program.setsLabel} />
+          <span className="text-muted-foreground">×</span>
+          <NumberCell value={lo} onChange={setLo} onCommit={commit} label={t.program.minRepsLabel} />
+          <span className="text-muted-foreground">–</span>
+          <NumberCell value={hi} onChange={setHi} onCommit={commit} label={t.program.maxRepsLabel} />
+        </div>
+
         <button
           type="button"
-          aria-label={t.program.moveDown}
-          disabled={isLast}
-          onClick={() => move("down")}
-          className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+          aria-label={`${t.program.remove} ${rx.name}`}
+          onClick={() =>
+            startTransition(() => void removePrescriptionAction({ id: rx.prescriptionId }))
+          }
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
         >
-          <ChevronDown className="size-3.5" />
+          <Trash2 className="size-4" />
         </button>
       </div>
 
-      <span className="min-w-0 flex-1 truncate text-sm">{rx.name}</span>
-
-      <div className="flex items-center gap-1 tabular-nums">
-        <NumberCell value={sets} onChange={setSets} onCommit={commit} label={t.program.setsLabel} />
-        <span className="text-muted-foreground">×</span>
-        <NumberCell value={lo} onChange={setLo} onCommit={commit} label={t.program.minRepsLabel} />
-        <span className="text-muted-foreground">–</span>
-        <NumberCell value={hi} onChange={setHi} onCommit={commit} label={t.program.maxRepsLabel} />
-      </div>
-
-      <button
-        type="button"
-        aria-label={`${t.program.remove} ${rx.name}`}
-        onClick={() =>
-          startTransition(() => void removePrescriptionAction({ id: rx.prescriptionId }))
-        }
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-      >
-        <Trash2 className="size-4" />
-      </button>
+      {expanded && (
+        <ExerciseEditPanel
+          key={rx.exerciseId}
+          rx={rx}
+          library={library}
+          existingIds={existingIds}
+          onClose={() => setExpanded(false)}
+        />
+      )}
     </li>
+  );
+}
+
+/**
+ * Inline editor for the library exercise behind a prescription, plus a swap
+ * flow that re-points the slot at a different exercise (keeping sets/reps and
+ * position — logged history stays with the old exercise).
+ */
+function ExerciseEditPanel({
+  rx,
+  library,
+  existingIds,
+  onClose,
+}: {
+  rx: DayExercise;
+  library: Exercise[];
+  existingIds: Set<string>;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [type, setType] = useState<ExerciseType>(rx.type);
+  const [plus, setPlus] = useState(rx.isBodyweightPlus);
+  const [swapping, setSwapping] = useState(false);
+  const [, startTransition] = useTransition();
+  const run = (fn: () => Promise<unknown>) => startTransition(() => void fn());
+
+  return (
+    <div className="mx-4 mb-2.5 flex flex-col gap-2 rounded-xl border border-border bg-background/60 p-3">
+      <Input
+        defaultValue={rx.name}
+        aria-label={t.program.exerciseName}
+        onBlur={(e) => {
+          const name = e.target.value.trim();
+          if (name && name !== rx.name)
+            run(() => updateExerciseAction({ id: rx.exerciseId, name }));
+        }}
+        className="h-9"
+      />
+
+      <div className="flex gap-1.5">
+        {(["compound", "isolation"] as const).map((option) => (
+          <Button
+            key={option}
+            type="button"
+            size="sm"
+            variant={type === option ? "default" : "outline"}
+            onClick={() => {
+              if (option === type) return;
+              setType(option);
+              run(() => updateExerciseAction({ id: rx.exerciseId, type: option }));
+            }}
+            className="flex-1"
+          >
+            {t.exerciseTypes[option]}
+          </Button>
+        ))}
+      </div>
+
+      <label className="flex items-start gap-2 rounded-lg bg-muted/40 px-2.5 py-2">
+        <input
+          type="checkbox"
+          checked={plus}
+          onChange={(e) => {
+            setPlus(e.target.checked);
+            run(() =>
+              updateExerciseAction({ id: rx.exerciseId, isBodyweightPlus: e.target.checked })
+            );
+          }}
+          className="mt-0.5 size-4 accent-[var(--primary)]"
+        />
+        <span className="flex flex-col">
+          <span className="text-sm">{t.program.bodyweightPlus}</span>
+          <span className="text-xs text-muted-foreground">
+            {t.program.bodyweightPlusHint}
+          </span>
+        </span>
+      </label>
+
+      <Input
+        defaultValue={rx.injuryNote ?? ""}
+        placeholder={t.program.injuryNotePlaceholder}
+        aria-label={t.program.injuryNotePlaceholder}
+        onBlur={(e) => {
+          const note = e.target.value.trim();
+          if (note !== (rx.injuryNote ?? ""))
+            run(() => updateExerciseAction({ id: rx.exerciseId, injuryNote: note || null }));
+        }}
+        className="h-9"
+      />
+
+      <p className="text-xs text-muted-foreground">{t.program.editExerciseHint}</p>
+
+      {swapping ? (
+        <ExercisePicker
+          library={library}
+          existingIds={existingIds}
+          title={t.program.swapExercise}
+          onDone={() => setSwapping(false)}
+          onPick={async (exerciseId) => {
+            await swapPrescriptionExerciseAction({ id: rx.prescriptionId, exerciseId });
+            onClose();
+          }}
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => setSwapping(true)}
+          className="gap-1"
+        >
+          <ArrowLeftRight className="size-3.5" />
+          {t.program.swapExercise}
+        </Button>
+      )}
+    </div>
   );
 }
 

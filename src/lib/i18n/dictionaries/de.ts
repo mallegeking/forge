@@ -301,6 +301,11 @@ export const de: Dictionary = {
     searchLibrary: "Bibliothek durchsuchen…",
     noMatching: "Keine passenden Übungen.",
     newExercise: "Neue Übung",
+    editExercise: "Übung bearbeiten",
+    swapExercise: "Übung austauschen",
+    injuryNotePlaceholder: "Verletzungshinweis (optional)…",
+    editExerciseHint:
+      "Änderungen gelten überall, wo diese Übung vorkommt — Verlauf und Diagramme bleiben erhalten.",
   },
 
   session: {

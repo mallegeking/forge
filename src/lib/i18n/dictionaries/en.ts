@@ -299,6 +299,11 @@ export const en = {
     searchLibrary: "Search library…",
     noMatching: "No matching exercises.",
     newExercise: "New exercise",
+    editExercise: "Edit exercise",
+    swapExercise: "Swap exercise",
+    injuryNotePlaceholder: "Injury note (optional)…",
+    editExerciseHint:
+      "Changes apply everywhere this exercise appears — history and charts stay attached.",
   },
 
   session: {
