@@ -13,7 +13,7 @@ import {
   progressPhotos,
   type ExerciseType,
 } from "@/db/schema";
-import { and, asc, count, desc, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { computeTrainingWeek, resolveDeload } from "@/lib/progression";
 
@@ -439,6 +439,71 @@ export async function renameProgram(id: string, name: string) {
     .update(programs)
     .set({ name: name.trim() || "Untitled program", updatedAt: new Date() })
     .where(eq(programs.id, id));
+}
+
+/**
+ * Clone a program with all its days and prescriptions — the fast way to build a
+ * variant (e.g. a 6-day split from the 5-day one) instead of re-entering every
+ * day and exercise by hand. The copy starts inactive; activate it separately.
+ *
+ * Exercises are shared by reference, never cloned: both programs point at the
+ * same `exerciseId`, so a lift that appears in both keeps ONE continuous
+ * history (progression, PRs and charts are all keyed by exercise).
+ */
+export async function duplicateProgram(id: string, name?: string) {
+  const [source] = await db.select().from(programs).where(eq(programs.id, id));
+  if (!source) throw new Error(`Unknown program: ${id}`);
+
+  const days = await db
+    .select()
+    .from(programDays)
+    .where(eq(programDays.programId, id))
+    .orderBy(asc(programDays.orderIndex));
+
+  const newProgramId = nanoid();
+  await db.insert(programs).values({
+    id: newProgramId,
+    name: name?.trim() || `${source.name} (copy)`,
+    isActive: false,
+  });
+
+  if (days.length === 0) return newProgramId;
+
+  // Map old day id -> new day id so prescriptions can be re-pointed in one pass.
+  const newDayIdByOld = new Map(days.map((d) => [d.id, nanoid()]));
+  await db.insert(programDays).values(
+    days.map((d) => ({
+      id: newDayIdByOld.get(d.id)!,
+      programId: newProgramId,
+      name: d.name,
+      dayOfWeek: d.dayOfWeek,
+      orderIndex: d.orderIndex,
+    }))
+  );
+
+  // Bulk-copy prescriptions preserving orderIndex — going through
+  // addExerciseToDay would recompute the index per row (a query each, and the
+  // source ordering would be lost on days whose indices aren't contiguous).
+  const prescriptions = await db
+    .select()
+    .from(programDayExercises)
+    .where(inArray(programDayExercises.dayId, [...newDayIdByOld.keys()]));
+
+  if (prescriptions.length > 0) {
+    await db.insert(programDayExercises).values(
+      prescriptions.map((p) => ({
+        id: nanoid(),
+        dayId: newDayIdByOld.get(p.dayId)!,
+        exerciseId: p.exerciseId,
+        orderIndex: p.orderIndex,
+        targetSets: p.targetSets,
+        repMin: p.repMin,
+        repMax: p.repMax,
+      }))
+    );
+  }
+
+  return newProgramId;
 }
 
 export async function archiveProgram(id: string) {

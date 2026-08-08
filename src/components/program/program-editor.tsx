@@ -7,6 +7,7 @@ import {
   Archive,
   ArrowLeftRight,
   ChevronDown,
+  Copy,
   ChevronLeft,
   ChevronUp,
   Pencil,
@@ -34,6 +35,7 @@ import {
   removeDayAction,
   renameProgramAction,
   createProgramAction,
+  duplicateProgramAction,
   archiveProgramAction,
   restoreProgramAction,
   setActiveProgramAction,
@@ -61,10 +63,11 @@ export function ProgramEditor({
 }) {
   const t = useT();
   const [editing, setEditing] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   return (
     <div className="-mx-4 -mt-5 animate-[fadeIn_0.3s_ease] px-[22px] pb-2">
-      {/* Header: back · PROGRAM wordmark + caption · EDIT pill */}
+      {/* Header: back · PROGRAM wordmark + plan chip · EDIT pill */}
       <header className="-mx-[22px] flex items-center justify-between px-[22px] pt-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <Link
@@ -78,10 +81,23 @@ export function ProgramEditor({
             <span className="font-display text-[17px] font-bold leading-none tracking-[0.14em] uppercase">
               {t.program.title}
             </span>
-            <span className="mt-1 truncate text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-              {days.length}
-              {t.program.daySplit} · {t.program.active}
-            </span>
+            {/* The caption doubles as the plan switcher — switching a plan
+                shouldn't require entering edit mode. */}
+            <button
+              type="button"
+              aria-label={t.program.switchPlan}
+              aria-expanded={switching}
+              onClick={() => setSwitching((s) => !s)}
+              className="mt-1 flex min-w-0 items-center gap-1 text-[10px] tracking-[0.16em] text-muted-foreground uppercase"
+            >
+              <span className="truncate">
+                {days.length}
+                {t.program.daySplit} · {program.name}
+              </span>
+              <ChevronDown
+                className={`size-3 shrink-0 transition-transform ${switching ? "rotate-180" : ""}`}
+              />
+            </button>
           </div>
         </div>
         <button
@@ -105,6 +121,14 @@ export function ProgramEditor({
       </header>
 
       <div className="pt-[18px]">
+        {switching && (
+          <PlanSwitcher
+            programs={programs}
+            activeId={program.id}
+            onSwitched={() => setSwitching(false)}
+          />
+        )}
+
         {editing && <ProgramManager program={program} programs={programs} />}
 
         {editing ? (
@@ -238,6 +262,61 @@ function CollapsibleDays({ days }: { days: DayBlock[] }) {
 
 // --- Program manager (switch / create / rename / archive) ------------------
 
+/**
+ * The fast path: tap a plan to make it active. Deliberately switch-only —
+ * creating, renaming, duplicating and archiving live in ProgramManager under
+ * EDIT, so falling back to another plan stays two taps.
+ */
+function PlanSwitcher({
+  programs,
+  activeId,
+  onSwitched,
+}: {
+  programs: Program[];
+  activeId: string;
+  onSwitched: () => void;
+}) {
+  const t = useT();
+  const [, startTransition] = useTransition();
+
+  return (
+    <Card className="mb-4 gap-1 p-2">
+      {programs.map((p) => {
+        const isActive = p.id === activeId;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            disabled={isActive}
+            onClick={() =>
+              startTransition(async () => {
+                await setActiveProgramAction({ id: p.id });
+                onSwitched();
+              })
+            }
+            className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${
+              isActive ? "bg-primary/10" : "hover:bg-muted"
+            }`}
+          >
+            <span className="truncate">{p.name}</span>
+            {isActive ? (
+              <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-medium text-primary">
+                {t.program.active}
+              </span>
+            ) : (
+              p.archivedAt && (
+                <span className="shrink-0 text-[0.65rem] text-muted-foreground">
+                  {t.program.archived}
+                </span>
+              )
+            )}
+          </button>
+        );
+      })}
+    </Card>
+  );
+}
+
 function ProgramManager({
   program,
   programs,
@@ -307,6 +386,21 @@ function ProgramManager({
                     {t.program.activate}
                   </Button>
                 )}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`${t.program.duplicateProgram}: ${p.name}`}
+                  onClick={() =>
+                    run(() =>
+                      duplicateProgramAction({
+                        id: p.id,
+                        name: `${p.name} (${t.program.copySuffix})`,
+                      })
+                    )
+                  }
+                >
+                  <Copy className="size-3.5" />
+                </Button>
                 {p.archivedAt ? (
                   <Button
                     variant="ghost"

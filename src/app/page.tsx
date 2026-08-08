@@ -6,7 +6,7 @@ import {
   getDayExercises,
   getCoachingInput,
   getHomeLedger,
-  getCompletedDayIdsThisWeek,
+  getWeekCompletions,
   getBodyweightEntries,
   hasDeloadSessionThisWeek,
   isoWeekday,
@@ -76,7 +76,7 @@ export default async function Home() {
     postponedWeek,
     snapshot,
     ledger,
-    completedDayIds,
+    weekCompletions,
     bwEntries,
     nutrition,
     deloadStarted,
@@ -86,11 +86,11 @@ export default async function Home() {
     getSetting("trainingStartDate"),
     getSetting("deloadPostponedWeek"),
     getCoachingInput(),
-    getHomeLedger(program.id),
-    getCompletedDayIdsThisWeek(program.id),
+    getHomeLedger(),
+    getWeekCompletions(),
     getBodyweightEntries(),
     getNutritionConfig(),
-    hasDeloadSessionThisWeek(program.id),
+    hasDeloadSessionThisWeek(),
   ]);
 
   const today = isoWeekday();
@@ -130,8 +130,11 @@ export default async function Home() {
     ? computeTrainingWeek(new Date(startIso), new Date())
     : null;
   const deload = week != null && resolveDeload(week, postponedWeek);
-  const completedToday = todayDay ? completedDayIds.has(todayDay.id) : false;
-  const weekDoneCount = completedDayIds.size;
+  const completedToday = todayDay
+    ? weekCompletions.dayIds.has(todayDay.id)
+    : false;
+  // Counts every workout this week, including ones logged on another plan.
+  const weekDoneCount = weekCompletions.count;
 
   // Bodyweight mini: latest weekly average, this-week delta, and a sparkline.
   const bwPoints = weeklyAverages(
@@ -410,7 +413,7 @@ export default async function Home() {
               dayName={day.name}
               weekday={day.dayOfWeek}
               isToday={day.dayOfWeek === today}
-              isDone={completedDayIds.has(day.id)}
+              isDone={weekCompletions.dayIds.has(day.id)}
               exerciseCount={counts.get(day.id) ?? 0}
             />
           ))}

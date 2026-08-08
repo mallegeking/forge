@@ -703,7 +703,7 @@ export type HomeLedger = {
  * beating that exercise's best in any earlier session (mirrors the receipt).
  * Returns null when no session has been completed yet.
  */
-export async function getHomeLedger(programId: string): Promise<HomeLedger | null> {
+export async function getHomeLedger(): Promise<HomeLedger | null> {
   const [session] = await db
     .select({
       id: workoutSessions.id,
@@ -714,12 +714,10 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
     })
     .from(workoutSessions)
     .innerJoin(programDays, eq(workoutSessions.dayId, programDays.id))
-    .where(
-      and(
-        eq(workoutSessions.programId, programId),
-        isNotNull(workoutSessions.completedAt)
-      )
-    )
+    // Not scoped to the active program: your last workout is your last
+    // workout, whichever plan it came from — switching plans must not blank
+    // the card.
+    .where(isNotNull(workoutSessions.completedAt))
     .orderBy(desc(workoutSessions.performedAt))
     .limit(1);
 
@@ -756,19 +754,16 @@ export async function getHomeLedger(programId: string): Promise<HomeLedger | nul
     }
   }
 
-  // Best weight per exercise across every earlier session in this program.
+  // Best weight per exercise across every earlier session, on any plan — a lift
+  // shares one identity (and one history) wherever it's prescribed, so a PR is
+  // measured against everything you've lifted, not just the active plan.
   const prs: { exerciseId: string; weightKg: number; reps: number }[] = [];
   if (bestNow.size > 0) {
     const priorRows = await db
       .select({ exerciseId: setLogs.exerciseId, weightKg: setLogs.weightKg })
       .from(setLogs)
       .innerJoin(workoutSessions, eq(setLogs.sessionId, workoutSessions.id))
-      .where(
-        and(
-          eq(workoutSessions.programId, programId),
-          lt(workoutSessions.performedAt, session.performedAt)
-        )
-      );
+      .where(lt(workoutSessions.performedAt, session.performedAt));
 
     const bestPrior = new Map<string, number>();
     for (const r of priorRows) {
@@ -829,20 +824,28 @@ function startOfWeek(d: Date): Date {
  * Program-day ids that already have a completed session in the current calendar
  * week — drives the week rail's "DONE" marks and the home "FORGED TODAY" state.
  */
-export async function getCompletedDayIdsThisWeek(
-  programId: string
-): Promise<Set<string>> {
+/**
+ * This week's completed sessions, across EVERY plan — switching plans mid-week
+ * must not read as "you trained zero days".
+ *
+ * `dayIds` is used to tick off the active plan's days on the week rail; ids
+ * belonging to another plan simply never match one of its days, so they're
+ * harmless there. `count` is the honest total of workouts done this week.
+ */
+export async function getWeekCompletions(): Promise<{
+  dayIds: Set<string>;
+  count: number;
+}> {
   const rows = await db
     .select({ dayId: workoutSessions.dayId })
     .from(workoutSessions)
     .where(
       and(
-        eq(workoutSessions.programId, programId),
         isNotNull(workoutSessions.completedAt),
         gte(workoutSessions.performedAt, startOfWeek(new Date()))
       )
     );
-  return new Set(rows.map((r) => r.dayId));
+  return { dayIds: new Set(rows.map((r) => r.dayId)), count: rows.length };
 }
 
 /**
@@ -851,15 +854,14 @@ export async function getCompletedDayIdsThisWeek(
  * mid-deload is what leaves the week half-deloaded (some days light, the rest
  * never deloaded).
  */
-export async function hasDeloadSessionThisWeek(
-  programId: string
-): Promise<boolean> {
+export async function hasDeloadSessionThisWeek(): Promise<boolean> {
   const [row] = await db
     .select({ id: workoutSessions.id })
     .from(workoutSessions)
+    // Not plan-scoped: the deload cadence is global (it tracks the body, not
+    // the plan), so a deload started on another plan still counts.
     .where(
       and(
-        eq(workoutSessions.programId, programId),
         eq(workoutSessions.isDeload, true),
         gte(workoutSessions.performedAt, startOfWeek(new Date()))
       )

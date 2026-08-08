@@ -27,6 +27,7 @@ import {
   createExercise,
   updateExercise,
   createProgram,
+  duplicateProgram,
   renameProgram,
   archiveProgram,
   restoreProgram,
@@ -277,6 +278,12 @@ export async function updateExerciseAction(input: {
 
 export async function createProgramAction(input: { name: string }) {
   const id = await createProgram(input.name);
+  revalidateProgram();
+  return id;
+}
+
+export async function duplicateProgramAction(input: { id: string; name?: string }) {
+  const id = await duplicateProgram(input.id, input.name);
   revalidateProgram();
   return id;
 }

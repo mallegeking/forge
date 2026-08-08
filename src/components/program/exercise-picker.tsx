@@ -9,6 +9,7 @@ import {
   createExerciseAction,
 } from "@/app/actions";
 import { restSecondsFor } from "@/lib/progression";
+import { catalogSuggestions, type CatalogEntry } from "@/lib/exercise-catalog";
 import { useT } from "@/components/i18n/i18n-provider";
 import type { Exercise, ExerciseType } from "@/db/schema";
 
@@ -45,6 +46,13 @@ export function ExercisePicker({
   const options = library.filter(
     (e) => !existingIds.has(e.id) && e.name.toLowerCase().includes(q)
   );
+  // Common movements/machines you haven't added yet — picking one creates the
+  // library exercise and adds it in a single tap, so the library only grows
+  // with what's actually trained.
+  const suggestions = catalogSuggestions(
+    query,
+    library.map((e) => e.name)
+  );
 
   const finish = async (exerciseId: string) => {
     if (onPick) await onPick(exerciseId);
@@ -66,6 +74,20 @@ export function ExercisePicker({
         type: newType,
         defaultRestSeconds: restSecondsFor(newType),
         isBodyweightPlus: newPlus,
+      });
+      await finish(id);
+    });
+  };
+
+  /** Same path as createAndAdd, with the catalog entry's details prefilled. */
+  const addFromCatalog = (entry: CatalogEntry) => {
+    if (pending) return;
+    startTransition(async () => {
+      const id = await createExerciseAction({
+        name: entry.name,
+        type: entry.type,
+        defaultRestSeconds: restSecondsFor(entry.type),
+        isBodyweightPlus: entry.isBodyweightPlus ?? false,
       });
       await finish(id);
     });
@@ -169,10 +191,36 @@ export function ExercisePicker({
                 </button>
               </li>
             ))}
-            {options.length === 0 && (
+            {options.length === 0 && suggestions.length === 0 && (
               <li className="px-1 py-2 text-center text-xs text-muted-foreground">
                 {t.program.noMatching}
               </li>
+            )}
+
+            {suggestions.length > 0 && (
+              <>
+                <li className="mt-1 px-1 pt-1.5 text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">
+                  {t.program.fromCatalog}
+                </li>
+                {suggestions.map((entry) => (
+                  <li key={entry.name}>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => addFromCatalog(entry)}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm hover:bg-muted disabled:opacity-50"
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <Plus className="size-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{entry.name}</span>
+                      </span>
+                      <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                        {t.exerciseTypes[entry.type]}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </>
             )}
           </ul>
           <Button
